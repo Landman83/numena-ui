@@ -1,101 +1,267 @@
+'use client'
 import Image from "next/image";
+import { useState } from 'react'
+import { FiChevronDown } from 'react-icons/fi'
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [activeTab, setActiveTab] = useState<'orderbook' | 'latestTrades'>('orderbook')
+  const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy')
+  const [orderType, setOrderType] = useState<string>('market')
+  const [showAdvancedMenu, setShowAdvancedMenu] = useState(false)
+  const [positionsTab, setPositionsTab] = useState<'positions' | 'orders' | 'trades' | 'account'>('positions')
+  const [showTokenMenu, setShowTokenMenu] = useState(false)
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const advancedOrders = [
+    'Stop Loss',
+    'Stop Limit',
+    'Take Profit',
+    'Take Profit Limit',
+    'Pegged',
+    'TWAP',
+    'VWAP',
+    'Bracket'
+  ]
+
+  return (
+    <main className="flex min-h-screen flex-col w-full">
+      {/* Symbol Banner */}
+      <div className="w-full px-5">
+        <div className="bg-[#050d17] rounded-lg shadow-md border border-gray-900 p-2">
+          <div className="flex space-x-6">
+            <div className="flex-shrink-0 px-2 hover:bg-[#0d1825] rounded cursor-pointer text-gray-400 hover:text-white transition-colors text-sm">
+              BTC/USD
+            </div>
+            <div className="flex-shrink-0 px-2 hover:bg-[#0d1825] rounded cursor-pointer text-gray-400 hover:text-white transition-colors text-sm">
+              ETH/USD
+            </div>
+            <div className="flex-shrink-0 px-2 hover:bg-[#0d1825] rounded cursor-pointer text-gray-400 hover:text-white transition-colors text-sm">
+              SOL/USD
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </div>
+
+      {/* New Widget */}
+      <div className="w-full px-5 pt-3">
+        <div className="bg-[#050d17] rounded-lg shadow-md border border-gray-900 p-2 h-[51px]">
+          <div className="flex items-center h-full">
+            <button
+              onClick={() => setShowTokenMenu(!showTokenMenu)}
+              className="flex items-center space-x-2 text-gray-300 hover:text-white px-3 text-lg relative"
+            >
+              <span>Numena Technologies (NMA)</span>
+              <FiChevronDown className={`transform transition-transform ${showTokenMenu ? 'rotate-180' : ''}`} />
+              
+              {showTokenMenu && (
+                <div className="absolute top-full left-0 mt-1 w-full bg-[#0d1825] border border-gray-800 rounded-lg shadow-lg z-10">
+                  {/* Dropdown content can go here */}
+                </div>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Trading Area */}
+      <div className="flex flex-1 px-5 pt-3 gap-3">
+        {/* Chart Section */}
+        <div className="flex-grow bg-[#050d17] rounded-lg shadow-md p-4 min-h-[600px] border border-gray-900">
+          <div className="text-gray-500 flex items-center justify-center h-full border border-gray-900 rounded-lg">
+            TradingView Chart Placeholder
+          </div>
+        </div>
+
+        {/* Right Side Panel */}
+        <div className="flex gap-3" style={{ width: '600px' }}>
+          {/* Orderbook */}
+          <div className="flex-1 bg-[#050d17] rounded-lg shadow-md p-4 border border-gray-900">
+            <div className="flex space-x-4 mb-4">
+              <button 
+                onClick={() => setActiveTab('orderbook')}
+                className={`text-gray-300 ${
+                  activeTab === 'orderbook' 
+                    ? 'font-semibold' 
+                    : 'font-normal'
+                }`}
+              >
+                <span className={`inline-block pb-1 border-b-2 ${
+                  activeTab === 'orderbook' ? 'border-white' : 'border-transparent'
+                }`}>
+                  Orderbook
+                </span>
+              </button>
+              <button 
+                onClick={() => setActiveTab('latestTrades')}
+                className={`text-gray-300 ${
+                  activeTab === 'latestTrades' 
+                    ? 'font-semibold' 
+                    : 'font-normal'
+                }`}
+              >
+                <span className={`inline-block pb-1 border-b-2 ${
+                  activeTab === 'latestTrades' ? 'border-white' : 'border-transparent'
+                }`}>
+                  Latest Trades
+                </span>
+              </button>
+            </div>
+            <div className="text-gray-500 flex items-center justify-center h-[500px] border border-gray-900 rounded-lg">
+              {activeTab === 'orderbook' ? 'Orderbook Placeholder' : 'Latest Trades Placeholder'}
+            </div>
+          </div>
+
+          {/* Buy/Sell Widget */}
+          <div className="flex-1 bg-[#050d17] rounded-lg shadow-md p-4 border border-gray-900">
+            {/* Buy/Sell Toggle */}
+            <div className="flex space-x-4 mb-4">
+              <button 
+                onClick={() => setTradeType('buy')}
+                className={`text-gray-300 w-12 text-left ${
+                  tradeType === 'buy' 
+                    ? 'font-semibold' 
+                    : 'font-normal'
+                }`}
+              >
+                <span className={`inline-block pb-1 border-b-2 ${
+                  tradeType === 'buy' ? 'border-white' : 'border-transparent'
+                }`}>
+                  Buy
+                </span>
+              </button>
+              <button 
+                onClick={() => setTradeType('sell')}
+                className={`text-gray-300 ${
+                  tradeType === 'sell' 
+                    ? 'font-semibold' 
+                    : 'font-normal'
+                }`}
+              >
+                <span className={`inline-block pb-1 border-b-2 ${
+                  tradeType === 'sell' ? 'border-white' : 'border-transparent'
+                }`}>
+                  Sell
+                </span>
+              </button>
+            </div>
+
+            {/* Order Type Selector */}
+            <div className="flex space-x-4 mb-4">
+              <button
+                onClick={() => {
+                  setOrderType('market')
+                  setShowAdvancedMenu(false)
+                }}
+                className={`w-12 text-left px-0 py-1 ${
+                  orderType === 'market'
+                    ? 'bg-[#0d1825] text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Market
+              </button>
+              <button
+                onClick={() => {
+                  setOrderType('limit')
+                  setShowAdvancedMenu(false)
+                }}
+                className={`px-3 py-1 rounded ${
+                  orderType === 'limit'
+                    ? 'bg-[#0d1825] text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Limit
+              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowAdvancedMenu(!showAdvancedMenu)}
+                  className={`px-3 py-1 rounded flex items-center space-x-1 ${
+                    advancedOrders.includes(orderType)
+                      ? 'bg-[#0d1825] text-white'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <span>{advancedOrders.includes(orderType) ? orderType : 'Advanced'}</span>
+                  <FiChevronDown className={`transform transition-transform ${showAdvancedMenu ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {/* Advanced Orders Dropdown */}
+                {showAdvancedMenu && (
+                  <div className="absolute top-full left-0 mt-1 w-48 bg-[#0d1825] border border-gray-800 rounded-lg shadow-lg z-10">
+                    {advancedOrders.map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => {
+                          setOrderType(type)
+                          setShowAdvancedMenu(false)
+                        }}
+                        className="w-full pl-4 pr-2 py-2 text-left text-gray-400 hover:text-white hover:bg-[#161f2c] first:rounded-t-lg last:rounded-b-lg text-xs"
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="text-gray-500 flex items-center justify-center h-[500px] border border-gray-900 rounded-lg">
+              {`${tradeType.charAt(0).toUpperCase() + tradeType.slice(1)} ${orderType} Widget`}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Positions Widget */}
+      <div className="px-5 pt-3 pb-5">
+        <div className="bg-[#050d17] rounded-lg shadow-md p-4 border border-gray-900">
+          <div className="flex space-x-6 mb-4">
+            <button 
+              onClick={() => setPositionsTab('positions')}
+              className={`text-gray-300 pb-1 border-b-2 ${
+                positionsTab === 'positions' 
+                  ? 'font-semibold border-white' 
+                  : 'font-normal border-transparent'
+              }`}
+            >
+              Positions
+            </button>
+            <button 
+              onClick={() => setPositionsTab('orders')}
+              className={`text-gray-300 pb-1 border-b-2 ${
+                positionsTab === 'orders' 
+                  ? 'font-semibold border-white' 
+                  : 'font-normal border-transparent'
+              }`}
+            >
+              Orders
+            </button>
+            <button 
+              onClick={() => setPositionsTab('trades')}
+              className={`text-gray-300 pb-1 border-b-2 ${
+                positionsTab === 'trades' 
+                  ? 'font-semibold border-white' 
+                  : 'font-normal border-transparent'
+              }`}
+            >
+              Trades
+            </button>
+            <button 
+              onClick={() => setPositionsTab('account')}
+              className={`text-gray-300 pb-1 border-b-2 ${
+                positionsTab === 'account' 
+                  ? 'font-semibold border-white' 
+                  : 'font-normal border-transparent'
+              }`}
+            >
+              Account
+            </button>
+          </div>
+          <div className="text-gray-500 flex items-center justify-center h-[200px] border border-gray-900 rounded-lg">
+            {`${positionsTab.charAt(0).toUpperCase() + positionsTab.slice(1)} Placeholder`}
+          </div>
+        </div>
+      </div>
+    </main>
   );
 }
