@@ -41,10 +41,11 @@ export default function Home() {
         </div>
       </div>
 
-      {/* New Widget */}
+      {/* Ticker Widget */}
       <div className="w-full px-5 pt-3">
         <div className="bg-[#050d17] rounded-lg shadow-md border border-gray-900 p-2 h-[51px]">
           <div className="flex items-center h-full">
+            {/* Token Selector */}
             <button
               onClick={() => setShowTokenMenu(!showTokenMenu)}
               className="flex items-center space-x-2 text-gray-300 hover:text-white px-3 text-lg relative"
@@ -58,6 +59,32 @@ export default function Home() {
                 </div>
               )}
             </button>
+
+            {/* Divider */}
+            <div className="h-8 w-px bg-gray-800 mx-4"></div>
+
+            {/* Price */}
+            <div className="text-white text-xl font-semibold">
+              $183.65
+            </div>
+
+            {/* Divider */}
+            <div className="h-8 w-px bg-gray-800 mx-4"></div>
+
+            {/* Market Cap */}
+            <div className="flex flex-col items-start">
+              <span className="text-gray-400 text-xs">Market Cap</span>
+              <span className="text-gray-300 text-sm">$202.02M</span>
+            </div>
+
+            {/* Divider */}
+            <div className="h-8 w-px bg-gray-800 mx-4"></div>
+
+            {/* 24hr Volume */}
+            <div className="flex flex-col items-start">
+              <span className="text-gray-400 text-xs">24hr Volume</span>
+              <span className="text-gray-300 text-sm">$2.77M</span>
+            </div>
           </div>
         </div>
       </div>
