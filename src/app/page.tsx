@@ -230,48 +230,186 @@ export default function Home() {
         </div>
 
         {/* Right Side Panel */}
-        <div style={{ width: '600px' }}>
+        <div style={{ width: '651px' }}>
           <div className="flex gap-3">
-            {/* Orderbook */}
-            <div className="flex-1 bg-[#050d17] rounded-lg shadow-md p-4 border border-gray-900">
-              <div className="flex space-x-4 mb-4">
-                <button 
-                  onClick={() => setActiveTab('orderbook')}
-                  className={`text-gray-300 ${
-                    activeTab === 'orderbook' 
-                      ? 'font-semibold' 
-                      : 'font-normal'
-                  }`}
-                >
-                  <span className={`inline-block pb-1 border-b-2 ${
-                    activeTab === 'orderbook' ? 'border-white' : 'border-transparent'
-                  }`}>
-                    Orderbook
-                  </span>
-                </button>
-                <button 
-                  onClick={() => setActiveTab('latestTrades')}
-                  className={`text-gray-300 ${
-                    activeTab === 'latestTrades' 
-                      ? 'font-semibold' 
-                      : 'font-normal'
-                  }`}
-                >
-                  <span className={`inline-block pb-1 border-b-2 ${
-                    activeTab === 'latestTrades' ? 'border-white' : 'border-transparent'
-                  }`}>
-                    Latest Trades
-                  </span>
-                </button>
+          {/* Orderbook */}
+            <div className="flex-1 bg-[#050d17] rounded-lg shadow-md p-4 border border-gray-900" style={{ width: '351px' }}>
+              {/* Header Row */}
+              <div className="flex justify-between items-center mb-4 px-2">
+                <div className="flex space-x-4">
+                  <button 
+                    onClick={() => setActiveTab('orderbook')}
+                    className={`text-gray-300 ${
+                      activeTab === 'orderbook' 
+                        ? 'font-semibold' 
+                        : 'font-normal'
+                    }`}
+                  >
+                    <span className={`inline-block pb-1 border-b-2 ${
+                      activeTab === 'orderbook' ? 'border-white' : 'border-transparent'
+                    }`}>
+                      Orderbook
+                    </span>
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('latestTrades')}
+                    className={`text-gray-300 ${
+                      activeTab === 'latestTrades' 
+                        ? 'font-semibold' 
+                        : 'font-normal'
+                    }`}
+                  >
+                    <span className={`inline-block pb-1 border-b-2 ${
+                      activeTab === 'latestTrades' ? 'border-white' : 'border-transparent'
+                    }`}>
+                      Latest Trades
+                    </span>
+                  </button>
+                </div>
               </div>
-              <div className="text-gray-500 flex items-center justify-center h-[500px] border border-gray-900 rounded-lg">
-                {activeTab === 'orderbook' ? 'Orderbook Placeholder' : 'Latest Trades Placeholder'}
-              </div>
-            </div>
 
-            {/* Buy/Sell Widget */}
+              {/* Horizontal Divider */}
+              <div className="w-full h-px bg-gray-800 mb-4"></div>
+
+              {/* Column Headers */}
+              <div className="grid grid-cols-3 px-2 mb-3">
+                <div className="text-gray-400 text-sm text-left pl-0">Price</div>
+                <div className="text-gray-400 text-sm text-center">Shares</div>
+                <div className="text-gray-400 text-sm text-right pr-0">Total</div>
+              </div>
+
+              {/* Orderbook Content */}
+              <div className="relative h-[500px] flex flex-col -mx-4">
+                {/* Sell Orders */}
+                <div className="flex-1 flex flex-col justify-end px-2">
+                  {/* Ask Orders */}
+                  <div className="grid grid-cols-3 gap-1 text-sm relative z-10">
+                    <div className="text-red-400">$183.88</div>
+                    <div className="text-center text-gray-300">20,000</div>
+                    <div className="text-right text-gray-300">$3,677,600.00</div>
+
+                    <div className="text-red-400">$183.85</div>
+                    <div className="text-center text-gray-300">17,500</div>
+                    <div className="text-right text-gray-300">$3,217,375.00</div>
+
+                    <div className="text-red-400">$183.82</div>
+                    <div className="text-center text-gray-300">15,000</div>
+                    <div className="text-right text-gray-300">$2,757,300.00</div>
+
+                    <div className="text-red-400">$183.78</div>
+                    <div className="text-center text-gray-300">12,500</div>
+                    <div className="text-right text-gray-300">$2,297,250.00</div>
+
+                    <div className="text-red-400">$183.75</div>
+                    <div className="text-center text-gray-300">10,000</div>
+                    <div className="text-right text-gray-300">$1,837,500.00</div>
+
+                    <div className="text-red-400">$183.72</div>
+                    <div className="text-center text-gray-300">7,500</div>
+                    <div className="text-right text-gray-300">$1,377,900.00</div>
+
+                    <div className="text-red-400">$183.68</div>
+                    <div className="text-center text-gray-300">5,000</div>
+                    <div className="text-right text-gray-300">$918,400.00</div>
+
+                    <div className="text-red-400">$183.65</div>
+                    <div className="text-center text-gray-300">3,750</div>
+                    <div className="text-right text-gray-300">$688,687.50</div>
+
+                    <div className="text-red-400">$183.63</div>
+                    <div className="text-center text-gray-300">2,500</div>
+                    <div className="text-right text-gray-300">$459,075.00</div>
+
+                    <div className="text-red-400">$183.61</div>
+                    <div className="text-center text-gray-300">1,250</div>
+                    <div className="text-right text-gray-300">$229,512.50</div>
+                  </div>
+                </div>
+
+                {/* Price Indicator */}
+                <div className="w-full h-8 bg-gray-800/50 flex items-center justify-between">
+                  {/* Price Group - Left */}
+                  <div className="flex items-center gap-4 pl-2">
+                    {/* Midpoint Price */}
+                    <div className="relative group">
+                      <span className="text-gray-200 text-base font-medium">$183.60</span>
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-[#0d1825] text-xs text-gray-300 rounded border border-gray-800 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                        Midpoint Price
+                      </div>
+                    </div>
+
+                    {/* Last Price */}
+                    <div className="relative group">
+                      <span className="text-gray-400 text-sm">$183.65</span>
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-[#0d1825] text-xs text-gray-300 rounded border border-gray-800 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                        Last Price
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Spread Group - Right */}
+                  <div className="flex items-center mr-2">
+                    {/* Combined Spread */}
+                    <div className="relative group">
+                      <span className="text-gray-400 text-sm">$0.02 / 0.0109%</span>
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-[#0d1825] text-xs text-gray-300 rounded border border-gray-800 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                        Spread
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Buy Orders Container */}
+                <div className="flex-1 px-2 relative">
+                  {/* Bid Orders */}
+                  <div className="grid grid-cols-3 gap-1 text-sm relative z-10">
+                    <div className="text-green-400">$183.59</div>
+                    <div className="text-center text-gray-300">1,250</div>
+                    <div className="text-right text-gray-300">$229,487.50</div>
+
+                    <div className="text-green-400">$183.57</div>
+                    <div className="text-center text-gray-300">2,500</div>
+                    <div className="text-right text-gray-300">$458,925.00</div>
+
+                    <div className="text-green-400">$183.55</div>
+                    <div className="text-center text-gray-300">3,750</div>
+                    <div className="text-right text-gray-300">$688,312.50</div>
+
+                    <div className="text-green-400">$183.52</div>
+                    <div className="text-center text-gray-300">5,000</div>
+                    <div className="text-right text-gray-300">$917,600.00</div>
+
+                    <div className="text-green-400">$183.48</div>
+                    <div className="text-center text-gray-300">7,500</div>
+                    <div className="text-right text-gray-300">$1,376,100.00</div>
+
+                    <div className="text-green-400">$183.45</div>
+                    <div className="text-center text-gray-300">10,000</div>
+                    <div className="text-right text-gray-300">$1,834,500.00</div>
+
+                    <div className="text-green-400">$183.42</div>
+                    <div className="text-center text-gray-300">12,500</div>
+                    <div className="text-right text-gray-300">$2,292,750.00</div>
+
+                    <div className="text-green-400">$183.38</div>
+                    <div className="text-center text-gray-300">15,000</div>
+                    <div className="text-right text-gray-300">$2,750,700.00</div>
+
+                    <div className="text-green-400">$183.35</div>
+                    <div className="text-center text-gray-300">17,500</div>
+                    <div className="text-right text-gray-300">$3,208,625.00</div>
+
+                    <div className="text-green-400">$183.32</div>
+                    <div className="text-center text-gray-300">20,000</div>
+                    <div className="text-right text-gray-300">$3,666,400.00</div>
+                  </div>
+                </div>
+            </div>
+          </div>
+
+          {/* Buy/Sell Widget */}
             <div style={{ width: '300px' }}>
-              <div className={`bg-[#050d17] rounded-lg shadow-md p-4 border border-gray-900 ${
+              <div className={`bg-[#050d17] rounded-lg shadow-md p-4 border border-gray-900 h-[600px] ${
                 tradeType === 'buy' 
                   ? 'bg-gradient-to-b from-green-950/10 to-[#050d17]' 
                   : tradeType === 'sell'
