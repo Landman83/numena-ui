@@ -27,17 +27,17 @@ export default function NavBar() {
 
           {/* Main Navigation - 50px from end of Numena */}
           <div className="hidden md:flex items-center space-x-8 ml-[50px]">
+            <Link href="/portfolio" className="text-gray-400 hover:text-white transition-colors">
+              Portfolio
+            </Link>
             <Link href="/trade" className="text-gray-400 hover:text-white transition-colors">
               Trade
             </Link>
-            <Link href="/research" className="text-gray-400 hover:text-white transition-colors">
-              Research
+            <Link href="/markets" className="text-gray-400 hover:text-white transition-colors">
+              Markets
             </Link>
             <Link href="/earn" className="text-gray-400 hover:text-white transition-colors">
               Earn
-            </Link>
-            <Link href="/portfolio" className="text-gray-400 hover:text-white transition-colors">
-              Portfolio
             </Link>
           </div>
         </div>

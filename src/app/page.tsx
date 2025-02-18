@@ -1,7 +1,7 @@
 'use client'
 import Image from "next/image";
 import { useState } from 'react'
-import { FiChevronDown } from 'react-icons/fi'
+import { FiChevronDown, FiEdit2, FiX } from 'react-icons/fi'
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'orderbook' | 'latestTrades'>('orderbook')
@@ -275,7 +275,11 @@ export default function Home() {
               <div className="grid grid-cols-3 px-2 mb-3">
                 <div className="text-gray-400 text-sm text-left pl-0">Price</div>
                 <div className="text-gray-400 text-sm text-center">Shares</div>
-                <div className="text-gray-400 text-sm text-right pr-0">Total</div>
+                {activeTab === 'orderbook' ? (
+                  <div className="text-gray-400 text-sm text-right pr-0">Total</div>
+                ) : (
+                  <div className="text-gray-400 text-sm text-right pr-0">Time</div>
+                )}
               </div>
 
               {/* Orderbook Content */}
@@ -608,7 +612,7 @@ export default function Home() {
                         orderType === 'market' ? 'mb-4' : 'mb-3'
                       } ${
                         tradeType === 'buy' 
-                          ? 'bg-[#16a34a] hover:bg-[#15803d]' 
+                          ? 'bg-[#16a34a]/90 hover:bg-[#15803d]/90 border border-[#16a34a]' 
                           : 'bg-red-600 hover:bg-red-700'
                       } transition-colors`}
                     >
@@ -701,9 +705,208 @@ export default function Home() {
               Account
             </button>
           </div>
-          <div className="text-gray-500 flex items-center justify-center h-[200px] border border-gray-900 rounded-lg">
-            {`${positionsTab.charAt(0).toUpperCase() + positionsTab.slice(1)} Placeholder`}
-          </div>
+          {/* Positions Widget Content */}
+          {positionsTab === 'orders' ? (
+            // Orders Table
+            <div className="text-sm mt-4">
+              {/* Table Header */}
+              <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-gray-400 border-b border-gray-800 pb-3">
+                <div className="pl-[12px]">Market</div>
+                <div className="pl-0">Side</div>
+                <div className="pl-0">Type</div>
+                <div className="pl-[12px]">Current Price</div>
+                <div className="pl-[12px]">Limit Price</div>
+                <div className="pl-0">Quantity</div>
+                <div className="pl-[12px]">Total</div>
+                <div className="pl-[52px]">Status</div>
+                <div className="pl-[12px]">Time</div>
+                <div className="pl-0"></div>
+              </div>
+
+              {/* Table Content */}
+              <div className="text-gray-300 pt-3 h-[400px]">
+                <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-sm border-b border-gray-800/50 py-2">
+                  <div>NMA</div>
+                  <div><span className="text-green-400">Buy</span></div>
+                  <div>Limit</div>
+                  <div>$183.65</div>
+                  <div>$183.75</div>
+                  <div>5,000</div>
+                  <div>$918,750.00</div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '45%' }}></div>
+                    </div>
+                    <span>45%</span>
+                  </div>
+                  <div>03/14/24 20:24:33</div>
+                  <div className="flex gap-2">
+                    <button className="text-gray-400 hover:text-blue-400 transition-colors">
+                      <FiEdit2 className="w-4 h-4" />
+                    </button>
+                    <button className="text-gray-400 hover:text-red-400 transition-colors">
+                      <FiX className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-sm border-b border-gray-800/50 py-2">
+                  <div>NMA</div>
+                  <div><span className="text-red-400">Sell</span></div>
+                  <div>Limit</div>
+                  <div>$183.65</div>
+                  <div>$183.55</div>
+                  <div>2,500</div>
+                  <div>$458,875.00</div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '78%' }}></div>
+                    </div>
+                    <span>78%</span>
+                  </div>
+                  <div>03/14/24 20:23:15</div>
+                  <div className="flex gap-2">
+                    <button className="text-gray-400 hover:text-blue-400 transition-colors">
+                      <FiEdit2 className="w-4 h-4" />
+                    </button>
+                    <button className="text-gray-400 hover:text-red-400 transition-colors">
+                      <FiX className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-sm border-b border-gray-800/50 py-2">
+                  <div>NMA</div>
+                  <div><span className="text-green-400">Buy</span></div>
+                  <div>Limit</div>
+                  <div>$183.65</div>
+                  <div>$183.70</div>
+                  <div>3,750</div>
+                  <div>$688,875.00</div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '32%' }}></div>
+                    </div>
+                    <span>32%</span>
+                  </div>
+                  <div>03/14/24 20:22:48</div>
+                  <div className="flex gap-2">
+                    <button className="text-gray-400 hover:text-blue-400 transition-colors">
+                      <FiEdit2 className="w-4 h-4" />
+                    </button>
+                    <button className="text-gray-400 hover:text-red-400 transition-colors">
+                      <FiX className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-sm border-b border-gray-800/50 py-2">
+                  <div>NMA</div>
+                  <div><span className="text-red-400">Sell</span></div>
+                  <div>Limit</div>
+                  <div>$183.65</div>
+                  <div>$183.58</div>
+                  <div>4,200</div>
+                  <div>$771,036.00</div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '65%' }}></div>
+                    </div>
+                    <span>65%</span>
+                  </div>
+                  <div>03/14/24 20:22:12</div>
+                  <div className="flex gap-2">
+                    <button className="text-gray-400 hover:text-blue-400 transition-colors">
+                      <FiEdit2 className="w-4 h-4" />
+                    </button>
+                    <button className="text-gray-400 hover:text-red-400 transition-colors">
+                      <FiX className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-sm border-b border-gray-800/50 py-2">
+                  <div>NMA</div>
+                  <div><span className="text-green-400">Buy</span></div>
+                  <div>Limit</div>
+                  <div>$183.65</div>
+                  <div>$183.72</div>
+                  <div>1,800</div>
+                  <div>$330,696.00</div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '25%' }}></div>
+                    </div>
+                    <span>25%</span>
+                  </div>
+                  <div>03/14/24 20:21:55</div>
+                  <div className="flex gap-2">
+                    <button className="text-gray-400 hover:text-blue-400 transition-colors">
+                      <FiEdit2 className="w-4 h-4" />
+                    </button>
+                    <button className="text-gray-400 hover:text-red-400 transition-colors">
+                      <FiX className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-sm border-b border-gray-800/50 py-2">
+                  <div>NMA</div>
+                  <div><span className="text-red-400">Sell</span></div>
+                  <div>Limit</div>
+                  <div>$183.65</div>
+                  <div>$183.52</div>
+                  <div>3,300</div>
+                  <div>$605,616.00</div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '92%' }}></div>
+                    </div>
+                    <span>92%</span>
+                  </div>
+                  <div>03/14/24 20:21:33</div>
+                  <div className="flex gap-2">
+                    <button className="text-gray-400 hover:text-blue-400 transition-colors">
+                      <FiEdit2 className="w-4 h-4" />
+                    </button>
+                    <button className="text-gray-400 hover:text-red-400 transition-colors">
+                      <FiX className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-sm border-b border-gray-800/50 py-2">
+                  <div>NMA</div>
+                  <div><span className="text-green-400">Buy</span></div>
+                  <div>Limit</div>
+                  <div>$183.65</div>
+                  <div>$183.68</div>
+                  <div>2,900</div>
+                  <div>$532,672.00</div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '15%' }}></div>
+                    </div>
+                    <span>15%</span>
+                  </div>
+                  <div>03/14/24 20:21:09</div>
+                  <div className="flex gap-2">
+                    <button className="text-gray-400 hover:text-blue-400 transition-colors">
+                      <FiEdit2 className="w-4 h-4" />
+                    </button>
+                    <button className="text-gray-400 hover:text-red-400 transition-colors">
+                      <FiX className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Placeholder for other tabs
+            <div className="text-gray-500 flex items-center justify-center h-[400px] border border-gray-900 rounded-lg">
+              {`${positionsTab.charAt(0).toUpperCase() + positionsTab.slice(1)} Placeholder`}
+            </div>
+          )}
         </div>
       </div>
     </main>
