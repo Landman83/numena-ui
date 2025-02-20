@@ -21,6 +21,7 @@ export default function SignUp() {
   const [verified, setVerified] = useState(false)
   const [emailError, setEmailError] = useState(false)
   const [passwordError, setPasswordError] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleNextStage = () => {
     if (stage === 'email') {
@@ -46,9 +47,49 @@ export default function SignUp() {
     }
   }
 
-  const handleRegister = () => {
-    router.push('/trade/nma')
-  }
+  const handleRegister = async () => {
+    try {
+      setIsLoading(true);
+      
+      const registrationData = {
+        email,
+        username,
+        password
+      };
+      
+      console.log('Sending registration data:', {
+        ...registrationData,
+        password: '[HIDDEN]'
+      });
+
+      const response = await fetch('http://localhost:8000/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(registrationData)
+      });
+
+      const data = await response.json();
+      console.log('Server response:', data);
+
+      if (!response.ok) {
+        const errorMessage = typeof data.detail === 'string' 
+          ? data.detail 
+          : 'Registration failed';
+        throw new Error(errorMessage);
+      }
+
+      console.log('Registration successful:', data);
+      router.push('/trade/nma');
+    } catch (error) {
+      console.error('Registration error:', error instanceof Error ? error.message : 'Unknown error');
+      // You might want to show this error to the user
+      // setError(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Add these helper functions to check field completion
   const isEmailStageComplete = () => {
@@ -231,10 +272,12 @@ export default function SignUp() {
             <div className="absolute -bottom-16 inset-x-0">
               <button
                 onClick={handleRegister}
-                className="w-full py-2 rounded-lg font-semibold text-white bg-blue-600 
-                         hover:bg-blue-700 transition-colors"
+                disabled={isLoading}
+                className="w-full py-2 rounded-lg font-semibold text-white 
+                         bg-blue-600 hover:bg-blue-700 transition-colors
+                         disabled:bg-blue-400 disabled:cursor-not-allowed"
               >
-                Register
+                {isLoading ? 'Registering...' : 'Register'}
               </button>
             </div>
           )}

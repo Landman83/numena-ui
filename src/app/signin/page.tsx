@@ -4,21 +4,93 @@ import { useState } from 'react'
 import { IBM_Plex_Serif } from "next/font/google"
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@/contexts/AuthContext'
 
 const ibmPlexSerif = IBM_Plex_Serif({ 
   weight: '400',
   subsets: ['latin'],
 })
 
+// Add API client function
+const loginUser = async (credentials: {
+  username: string;
+  password: string;
+}) => {
+  try {
+    // Create FormData object
+    const formData = new URLSearchParams();
+    formData.append('username', credentials.username);
+    formData.append('password', credentials.password);
+
+    const response = await fetch('http://localhost:8000/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Login failed');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    throw error;
+  }
+};
+
 export default function SignIn() {
   const router = useRouter()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
+  const { login } = useAuth()
+  const [error, setError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
-  const handleSignIn = (e: React.FormEvent) => {
-    e.preventDefault()
-    router.push('/trade/nma')
-  }
+  // Update handleSignIn function
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault(); // Important: prevent form submission
+    
+    try {
+      setError('');
+      setIsLoading(true);
+      
+      console.log('Attempting login with:', {
+        username: identifier,
+        password: '[HIDDEN]'
+      });
+
+      const formData = new URLSearchParams();
+      formData.append('username', identifier);
+      formData.append('password', password);
+
+      const response = await fetch('http://localhost:8000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+      console.log('Server response:', data);
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Login failed');
+      }
+
+      login(data.access_token);
+      router.push('/trade/nma');
+    } catch (error) {
+      console.error('Login error:', error);
+      setError(error instanceof Error ? error.message : 'Login failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#030a13]">
@@ -37,11 +109,14 @@ export default function SignIn() {
             <h1 className="text-xl text-white font-semibold mb-6">Sign In</h1>
 
             {/* Form */}
-            <form onSubmit={handleSignIn} className="space-y-4">
-              {/* Email/Username Field */}
+            <form 
+              onSubmit={handleSignIn} 
+              className="space-y-4"
+              noValidate // Add this to prevent browser validation
+            >
               <div>
                 <label className="block text-gray-400 text-sm mb-2">
-                  Email or Username
+                  Username
                 </label>
                 <input
                   type="text"
@@ -49,11 +124,11 @@ export default function SignIn() {
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
                            bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
-                  placeholder="Enter your email or username"
+                  placeholder="Enter your username"
+                  disabled={isLoading}
                 />
               </div>
 
-              {/* Password Field */}
               <div>
                 <label className="block text-gray-400 text-sm mb-2">
                   Password
@@ -65,16 +140,24 @@ export default function SignIn() {
                   className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
                            bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
                   placeholder="Enter your password"
+                  disabled={isLoading}
                 />
               </div>
 
-              {/* Sign In Button */}
+              {error && (
+                <div className="text-red-500 text-sm text-center">
+                  {error}
+                </div>
+              )}
+
               <button 
                 type="submit"
+                disabled={isLoading || !identifier || !password}
                 className="w-full py-2 rounded-lg font-semibold text-white bg-blue-600 
-                         hover:bg-blue-700 transition-colors mt-6"
+                         hover:bg-blue-700 transition-colors disabled:bg-blue-400 
+                         disabled:cursor-not-allowed"
               >
-                Sign In
+                {isLoading ? 'Signing in...' : 'Sign In'}
               </button>
             </form>
 

@@ -4,6 +4,7 @@ import { IBM_Plex_Mono, Varta } from "next/font/google";
 import "./globals.css";
 import NavBar from "@/components/NavBar";
 import { usePathname } from 'next/navigation'
+import { AuthProvider } from '@/contexts/AuthContext';
 
 const ibmPlexMono = IBM_Plex_Mono({ 
   subsets: ["latin"],
@@ -26,8 +27,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${varta.className} bg-[#030a13] text-white`}>
-        {!hideNavbar && <NavBar />}
-        {children}
+        <AuthProvider>
+          {!hideNavbar && <NavBar />}
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
