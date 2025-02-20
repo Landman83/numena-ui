@@ -1,7 +1,9 @@
-import type { Metadata } from "next";
+'use client'
+
 import { IBM_Plex_Mono, Varta } from "next/font/google";
 import "./globals.css";
 import NavBar from "@/components/NavBar";
+import { usePathname } from 'next/navigation'
 
 const ibmPlexMono = IBM_Plex_Mono({ 
   subsets: ["latin"],
@@ -13,20 +15,18 @@ const varta = Varta({
   weight: ['400'],
 });
 
-export const metadata: Metadata = {
-  title: "Numena Trading Protocol",
-  description: "Securities trading protocol interface",
-};
-
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
+  const pathname = usePathname()
+  const hideNavbar = pathname === '/signin' || pathname === '/signup'
+
   return (
     <html lang="en" className="dark">
       <body className={`${varta.className} bg-[#030a13] text-white`}>
-        <NavBar />
+        {!hideNavbar && <NavBar />}
         {children}
       </body>
     </html>
