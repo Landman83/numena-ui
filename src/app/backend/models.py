@@ -21,9 +21,12 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_login = Column(DateTime(timezone=True), nullable=True)
+    identity_address = Column(String, unique=True, nullable=True, index=True)
+    identity_created_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationship to future Wallet model
     wallet = relationship("Wallet", back_populates="user", uselist=False)
+    identity = relationship("Identity", back_populates="user", uselist=False)
 
     @validates('email')
     def validate_email(self, key, email: str) -> str:
@@ -57,6 +60,17 @@ class User(Base):
         # Basic Ethereum address validation
         if not re.match(r'^0x[a-fA-F0-9]{40}$', address):
             raise ValueError("Invalid Ethereum wallet address format")
+        return address.lower()
+
+    @validates('identity_address')
+    def validate_identity_address(self, key, address: str) -> Optional[str]:
+        """Validate the format of an Ethereum identity contract address"""
+        if address is None:
+            return None
+            
+        # Basic Ethereum address validation
+        if not re.match(r'^0x[a-fA-F0-9]{40}$', address):
+            raise ValueError("Invalid Ethereum identity address format")
         return address.lower()
 
     def set_password(self, password: str) -> None:
@@ -116,6 +130,31 @@ class Wallet(Base):
         """Update the wallet's last used timestamp"""
         self.last_used = datetime.utcnow()
 
+class Identity(Base):
+    """Model to store additional identity-related information"""
+    __tablename__ = "identities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    address = Column(String, unique=True, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    symbol = Column(String, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_updated = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationship to User model
+    user = relationship("User", back_populates="identity")
+
+    @validates('address')
+    def validate_address(self, key, address: str) -> str:
+        if not re.match(r'^0x[a-fA-F0-9]{40}$', address):
+            raise ValueError("Invalid Ethereum identity address format")
+        return address.lower()
+
+    def update_last_updated(self) -> None:
+        """Update the last_updated timestamp"""
+        self.last_updated = datetime.utcnow()
+
 # Helper functions for database operations
 def create_user(
     db_session,
@@ -150,4 +189,43 @@ def get_user_by_wallet(db_session, wallet_address: str) -> Optional[User]:
     """Get a user by wallet address"""
     return db_session.query(User).filter(
         User.wallet_address == wallet_address.lower()
+    ).first()
+
+def create_identity(
+    db_session,
+    user_id: int,
+    address: str,
+    name: str,
+    symbol: str
+) -> Identity:
+    """Create a new identity record"""
+    identity = Identity(
+        user_id=user_id,
+        address=address,
+        name=name,
+        symbol=symbol
+    )
+    
+    # Update the associated user's identity_address
+    user = db_session.query(User).filter(User.id == user_id).first()
+    if user:
+        user.identity_address = address
+        user.identity_created_at = datetime.utcnow()
+    
+    db_session.add(identity)
+    db_session.commit()
+    db_session.refresh(identity)
+    
+    return identity
+
+def get_identity_by_address(db_session, address: str) -> Optional[Identity]:
+    """Get identity by contract address"""
+    return db_session.query(Identity).filter(
+        Identity.address == address.lower()
+    ).first()
+
+def get_identity_by_user_id(db_session, user_id: int) -> Optional[Identity]:
+    """Get identity by user ID"""
+    return db_session.query(Identity).filter(
+        Identity.user_id == user_id
     ).first()

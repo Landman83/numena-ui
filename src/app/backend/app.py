@@ -18,7 +18,8 @@ from models import (
     User,
     get_user_by_email,
     get_user_by_username,
-    create_user
+    create_user,
+    get_identity_by_user_id
 )
 from utils import (
     handle_exceptions,
@@ -30,7 +31,7 @@ from utils import (
 )
 
 # Update database URL with the password you set
-SQLALCHEMY_DATABASE_URL = "postgresql://numena_user:numena123@localhost/numena"
+SQLALCHEMY_DATABASE_URL = "postgresql://numena_user@localhost/numena"
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -258,6 +259,29 @@ async def get_user_profile(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+
+@app.get("/api/identity/{user_id}")
+async def get_user_identity(
+    user_id: int,
+    db: SessionLocal = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    identity = get_identity_by_user_id(db, user_id)
+    if not identity:
+        raise HTTPException(
+            status_code=404,
+            detail="Identity not found"
+        )
+    return identity
+
+@app.post("/api/identity/verify")
+async def verify_identity(
+    identity_address: str,
+    db: SessionLocal = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    # Here you would add verification logic for the identity
+    pass
 
 # Error handlers
 @app.exception_handler(HTTPException)

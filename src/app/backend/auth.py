@@ -10,8 +10,10 @@ from models import (
     User, 
     get_user_by_email, 
     get_user_by_username,
-    create_user
+    create_user,
+    create_identity
 )
+from contracts import contract_manager
 
 # Security configurations
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -92,13 +94,37 @@ class AuthHandler:
         print(f"Created at: {user.created_at}")
         print("========================\n")
         
-        return {
-            "id": user.id,
-            "email": user.email,
-            "username": user.username,
-            "wallet_address": user.wallet_address,
-            "created_at": user.created_at
-        }
+        try:
+            # Deploy identity contract
+            identity_result = await contract_manager.deploy_identity(
+                name=f"{username}'s Identity",
+                symbol=f"{username[:3].upper()}ID",
+                owner_address=wallet["address"],
+                private_key=wallet["private_key"]
+            )
+            
+            # Store identity information
+            identity = create_identity(
+                db_session=db,
+                user_id=user.id,
+                address=identity_result['identity_address'],
+                name=f"{username}'s Identity",
+                symbol=f"{username[:3].upper()}ID"
+            )
+            
+            return {
+                "id": user.id,
+                "email": user.email,
+                "username": user.username,
+                "wallet_address": user.wallet_address,
+                "identity_address": identity.address,
+                "created_at": user.created_at
+            }
+            
+        except Exception as e:
+            # Rollback in case of failure
+            db.rollback()
+            raise AuthError(f"Failed to create identity: {str(e)}")
 
     async def login_user(self, username: str, password: str, db) -> Dict:
         """Authenticate a user and return a token"""
