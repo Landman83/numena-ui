@@ -19,7 +19,8 @@ from models import (
     get_user_by_email,
     get_user_by_username,
     create_user,
-    get_identity_by_user_id
+    get_identity_by_user_id,
+    Wallet
 )
 from utils import (
     handle_exceptions,
@@ -27,7 +28,8 @@ from utils import (
     ResponseFormatter,
     create_jwt_token,
     encrypt_private_key,
-    ValidationError
+    ValidationError,
+    decrypt_private_key
 )
 
 # Update database URL with the password you set
@@ -282,6 +284,25 @@ async def verify_identity(
 ):
     # Here you would add verification logic for the identity
     pass
+
+@app.get("/api/user/private-key")
+async def get_private_key(current_user: dict = Depends(get_current_user), db: SessionLocal = Depends(get_db)):
+    try:
+        user = get_user_by_username(db, current_user['username'])
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        wallet = db.query(Wallet).filter(Wallet.user_id == user.id).first()
+        if not wallet:
+            raise HTTPException(status_code=404, detail="Wallet not found")
+            
+        # Decrypt the private key
+        private_key = decrypt_private_key(wallet.encrypted_private_key)
+        
+        return {"private_key": private_key}
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 # Error handlers
 @app.exception_handler(HTTPException)

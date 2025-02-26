@@ -1,15 +1,16 @@
 'use client'
 import Image from "next/image";
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { FiChevronDown, FiEdit2, FiX, FiUser } from 'react-icons/fi'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { OrderbookService } from '@/services/orderbook';
 
 export default function Home() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'orderbook' | 'latestTrades'>('orderbook')
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy')
-  const [orderType, setOrderType] = useState<string>('market')
+  const [orderType, setOrderType] = useState<'market' | 'limit'>('market')
   const [showAdvancedMenu, setShowAdvancedMenu] = useState(false)
   const [positionsTab, setPositionsTab] = useState<'positions' | 'orders' | 'trades' | 'account'>('positions')
   const [showTokenMenu, setShowTokenMenu] = useState(false)
@@ -23,6 +24,8 @@ export default function Home() {
   const [limitQuantity, setLimitQuantity] = useState<string>('')
   const [limitTotal, setLimitTotal] = useState<string>('')
   const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const orderbookService = new OrderbookService();
+  const [userWallet, setUserWallet] = useState<string | null>(null);
 
   const advancedOrders = [
     'Stop Loss',
@@ -124,6 +127,64 @@ export default function Home() {
   const handleLogout = () => {
     // Add logout logic here
     router.push('/sign-up-or-in/signin')
+  }
+
+  // Fetch user profile including wallet address
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await fetch('/api/user/me', {
+          credentials: 'include'  // Include cookies for auth
+        });
+        if (!response.ok) {
+          throw new Error('Failed to fetch user profile');
+        }
+        const data = await response.json();
+        setUserWallet(data.wallet_address);
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+        router.push('/sign-up-or-in/signin');
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
+  const handleOrderSubmit = async () => {
+    if (!userWallet) {
+      console.error('No wallet address available');
+      return;
+    }
+
+    try {
+      const orderData = {
+        book_id: 'NMA-USD',
+        type: tradeType,
+        order_type: orderType,
+        trader: userWallet,  // Add wallet address
+        ...(orderType === 'market' 
+          ? {
+              quantity: parseFloat(sizeNMA),
+              total: parseFloat(sizeUSD),
+            }
+          : {
+              price: parseFloat(limitPrice),
+              quantity: parseFloat(limitQuantity),
+              total: parseFloat(limitTotal),
+            }
+        ),
+      };
+
+      const response = await orderbookService.submitOrder(orderData);
+      console.log('Order submitted successfully:', response);
+      
+      // TODO: Add success notification
+      // TODO: Clear form or update UI as needed
+      
+    } catch (error) {
+      console.error('Failed to submit order:', error);
+      // TODO: Add error notification
+    }
   }
 
   return (
@@ -479,7 +540,9 @@ export default function Home() {
                           <button
                             key={type}
                             onClick={() => {
-                              setOrderType(type)
+                              if (type === 'market' || type === 'limit') {
+                                setOrderType(type)
+                              }
                               setShowAdvancedMenu(false)
                             }}
                             className="w-full px-3 py-2 text-left text-gray-400 hover:text-white hover:bg-[#161f2c] first:rounded-t-lg last:rounded-b-lg text-sm"
@@ -617,6 +680,7 @@ export default function Home() {
                   <div className="mt-auto px-2">
                     {/* Buy/Sell Button */}
                     <button 
+                      onClick={handleOrderSubmit}
                       className={`w-full py-3 rounded-lg font-semibold text-white ${
                         orderType === 'market' ? 'mb-4' : 'mb-3'
                       } ${
