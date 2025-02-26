@@ -26,6 +26,7 @@ export default function Home() {
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const orderbookService = new OrderbookService();
   const [userWallet, setUserWallet] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const advancedOrders = [
     'Stop Loss',
@@ -129,21 +130,21 @@ export default function Home() {
     router.push('/sign-up-or-in/signin')
   }
 
-  // Fetch user profile including wallet address
+  // Update useEffect to only set authentication status
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
         const response = await fetch('/api/user/me', {
-          credentials: 'include'  // Include cookies for auth
+          credentials: 'include'
         });
-        if (!response.ok) {
-          throw new Error('Failed to fetch user profile');
+        if (response.ok) {
+          const data = await response.json();
+          setUserWallet(data.wallet_address);
+          setIsAuthenticated(true);
         }
-        const data = await response.json();
-        setUserWallet(data.wallet_address);
       } catch (error) {
         console.error('Error fetching user profile:', error);
-        router.push('/sign-up-or-in/signin');
+        setIsAuthenticated(false);
       }
     };
 
@@ -151,6 +152,12 @@ export default function Home() {
   }, []);
 
   const handleOrderSubmit = async () => {
+    if (!isAuthenticated) {
+      // Redirect to sign in page if not authenticated
+      router.push('/sign-up-or-in/signin');
+      return;
+    }
+
     if (!userWallet) {
       console.error('No wallet address available');
       return;
@@ -684,12 +691,16 @@ export default function Home() {
                       className={`w-full py-3 rounded-lg font-semibold text-white ${
                         orderType === 'market' ? 'mb-4' : 'mb-3'
                       } ${
-                        tradeType === 'buy' 
-                          ? 'bg-[#16a34a]/90 hover:bg-[#15803d]/90 border border-[#16a34a]' 
-                          : 'bg-red-600 hover:bg-red-700'
+                        !isAuthenticated
+                          ? 'bg-blue-600 hover:bg-blue-700 border border-blue-500'
+                          : tradeType === 'buy' 
+                            ? 'bg-[#16a34a]/90 hover:bg-[#15803d]/90 border border-[#16a34a]' 
+                            : 'bg-red-600 hover:bg-red-700'
                       } transition-colors`}
                     >
-                      {tradeType === 'buy' ? 'Buy NMA' : 'Sell NMA'}
+                      {isAuthenticated 
+                        ? `${tradeType === 'buy' ? 'Buy' : 'Sell'} NMA` 
+                        : 'Sign in to Trade'}
                     </button>
 
                     {/* Order Details */}
