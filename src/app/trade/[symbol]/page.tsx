@@ -5,6 +5,7 @@ import { FiChevronDown, FiEdit2, FiX, FiUser } from 'react-icons/fi'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { OrderbookService } from '@/services/orderbook';
+import React from 'react';
 
 export default function Home() {
   const router = useRouter()
@@ -27,6 +28,22 @@ export default function Home() {
   const orderbookService = new OrderbookService();
   const [userWallet, setUserWallet] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Add new state for orderbook data
+  const [orderbook, setOrderbook] = useState<{
+    bids: Array<{price: number, quantity: number, total: number}>;
+    asks: Array<{price: number, quantity: number, total: number}>;
+  }>({
+    bids: [],
+    asks: []
+  });
+  const [lastPrice, setLastPrice] = useState<number | null>(null);
+  const [midpointPrice, setMidpointPrice] = useState<number | null>(null);
+  const [spread, setSpread] = useState<{absolute: number, percentage: number} | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
+
+  // Add this state to control client-side rendering
+  const [isClient, setIsClient] = useState(false);
 
   const advancedOrders = [
     'Stop Loss',
@@ -151,6 +168,154 @@ export default function Home() {
     fetchUserProfile();
   }, []);
 
+  // Set client-side rendering flag
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // Update WebSocket connection
+  useEffect(() => {
+    if (!isClient) return; // Only run on client
+    
+    const symbol = window.location.pathname.split('/').pop() || 'nma';
+    const bookId = symbol.toUpperCase() + '-USD';
+    
+    // Always fetch initial data via REST
+    fetchOrderbookREST(bookId);
+    
+    // Set up polling as fallback
+    const intervalId = setInterval(() => {
+      fetchOrderbookREST(bookId);
+    }, 1000);
+    
+    // Try WebSocket connection with proper URL
+    let ws: WebSocket | null = null;
+    try {
+      // Use the direct WebSocket URL (not through Next.js rewrites)
+      console.log('Attempting WebSocket connection...');
+      ws = new WebSocket(`ws://127.0.0.1:8080/api/books/${bookId}/ws`);
+      
+      // Add event listeners with better error handling
+      ws.onopen = () => {
+        console.log('WebSocket connected successfully');
+        clearInterval(intervalId); // Stop polling if WebSocket works
+        setWsConnected(true);
+      };
+      
+      ws.onmessage = (event) => {
+        console.log('WebSocket message received:', event.data);
+        try {
+          const data = JSON.parse(event.data);
+          processOrderbookData(data);
+        } catch (error) {
+          console.error('Error processing message:', error);
+        }
+      };
+      
+      ws.onerror = (event) => {
+        console.error('WebSocket error:', event);
+        // Don't stop polling on error
+      };
+      
+      ws.onclose = (event) => {
+        console.log('WebSocket closed with code:', event.code, 'reason:', event.reason);
+        setWsConnected(false);
+        // Restart polling if WebSocket closes
+        if (intervalId === null) {
+          const newIntervalId = setInterval(() => {
+            fetchOrderbookREST(bookId);
+          }, 1000);
+          return () => clearInterval(newIntervalId);
+        }
+      };
+    } catch (error) {
+      console.error('Error creating WebSocket:', error);
+    }
+    
+    return () => {
+      if (ws) ws.close();
+      clearInterval(intervalId);
+    };
+  }, [isClient]);
+  
+  // Update the REST API fetch function
+  const fetchOrderbookREST = async (bookId: string) => {
+    try {
+      // Use the direct URL with proper CORS headers
+      const response = await fetch(`http://127.0.0.1:8080/api/books/${bookId}/orderbook`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        // Include credentials if your API requires authentication
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      processOrderbookData(data);
+    } catch (error) {
+      console.error('Error fetching orderbook via REST:', error);
+    }
+  };
+  
+  // Process orderbook data
+  const processOrderbookData = (data: any) => {
+    // Process bids (positive prices)
+    const processedBids = processOrders(data.bids, true);
+    
+    // Process asks (negative prices in the API, convert to positive for display)
+    const processedAsks = processOrders(data.asks.map((ask: any) => ({
+      price: Math.abs(ask.price),
+      quantity: ask.size || ask.quantity
+    })), false);
+    
+    setOrderbook({
+      bids: processedBids,
+      asks: processedAsks
+    });
+    
+    // Calculate midpoint price
+    if (processedBids.length > 0 && processedAsks.length > 0) {
+      const highestBid = processedBids[0].price;
+      const lowestAsk = processedAsks[0].price;
+      const midpoint = (highestBid + lowestAsk) / 2;
+      setMidpointPrice(midpoint);
+      
+      // Calculate spread
+      const absoluteSpread = lowestAsk - highestBid;
+      const percentageSpread = (absoluteSpread / midpoint) * 100;
+      setSpread({
+        absolute: absoluteSpread,
+        percentage: percentageSpread
+      });
+      
+      // Use highest bid as last price if not available
+      if (!lastPrice) {
+        setLastPrice(highestBid);
+      }
+    }
+  };
+  
+  // Helper function to process orders and calculate totals
+  const processOrders = (orders: Array<{price: number, quantity: number}>, isBid: boolean) => {
+    let runningTotal = 0;
+    return orders
+      .sort((a, b) => isBid ? b.price - a.price : a.price - b.price) // Sort bids descending, asks ascending
+      .map(order => {
+        runningTotal += order.quantity * order.price;
+        return {
+          price: order.price,
+          quantity: order.quantity,
+          total: runningTotal
+        };
+      });
+  };
+
   const handleOrderSubmit = async () => {
     if (!isAuthenticated) {
       // Redirect to sign in page if not authenticated
@@ -193,6 +358,12 @@ export default function Home() {
       // TODO: Add error notification
     }
   }
+
+  // Add null checks for toLocaleString
+  const formatDate = (date: Date | undefined) => {
+    if (!date) return '';
+    return date.toLocaleString();
+  };
 
   return (
     <main className="flex min-h-screen flex-col w-full">
@@ -364,47 +535,25 @@ export default function Home() {
                 {/* Sell Orders */}
                 <div className="flex-1 flex flex-col justify-end px-2">
                   {/* Ask Orders */}
-                  <div className="grid grid-cols-3 gap-1 text-sm relative z-10">
-                    <div className="text-red-400">$183.88</div>
-                    <div className="text-center text-gray-300">20,000</div>
-                    <div className="text-right text-gray-300">$3,677,600.00</div>
-
-                    <div className="text-red-400">$183.85</div>
-                    <div className="text-center text-gray-300">17,500</div>
-                    <div className="text-right text-gray-300">$3,217,375.00</div>
-
-                    <div className="text-red-400">$183.82</div>
-                    <div className="text-center text-gray-300">15,000</div>
-                    <div className="text-right text-gray-300">$2,757,300.00</div>
-
-                    <div className="text-red-400">$183.78</div>
-                    <div className="text-center text-gray-300">12,500</div>
-                    <div className="text-right text-gray-300">$2,297,250.00</div>
-
-                    <div className="text-red-400">$183.75</div>
-                    <div className="text-center text-gray-300">10,000</div>
-                    <div className="text-right text-gray-300">$1,837,500.00</div>
-
-                    <div className="text-red-400">$183.72</div>
-                    <div className="text-center text-gray-300">7,500</div>
-                    <div className="text-right text-gray-300">$1,377,900.00</div>
-
-                    <div className="text-red-400">$183.68</div>
-                    <div className="text-center text-gray-300">5,000</div>
-                    <div className="text-right text-gray-300">$918,400.00</div>
-
-                    <div className="text-red-400">$183.65</div>
-                    <div className="text-center text-gray-300">3,750</div>
-                    <div className="text-right text-gray-300">$688,687.50</div>
-
-                    <div className="text-red-400">$183.63</div>
-                    <div className="text-center text-gray-300">2,500</div>
-                    <div className="text-right text-gray-300">$459,075.00</div>
-
-                    <div className="text-red-400">$183.61</div>
-                    <div className="text-center text-gray-300">1,250</div>
-                    <div className="text-right text-gray-300">$229,512.50</div>
-                  </div>
+                  {isClient ? (
+                    <div className="grid grid-cols-3 gap-1 text-sm relative z-10">
+                      {orderbook.asks.slice().reverse().map((ask, index) => (
+                        <React.Fragment key={`ask-${index}`}>
+                          <div className="text-red-400">${ask.price.toFixed(2)}</div>
+                          <div className="text-center text-gray-300">
+                            {ask.quantity.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                          </div>
+                          <div className="text-right text-gray-300">
+                            ${ask.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex justify-center items-center h-40">
+                      <p>Loading orderbook...</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Price Indicator */}
@@ -413,7 +562,9 @@ export default function Home() {
                   <div className="flex items-center gap-4 pl-2">
                     {/* Midpoint Price */}
                     <div className="relative group">
-                      <span className="text-gray-200 text-base font-medium">$183.60</span>
+                      <span className="text-gray-200 text-base font-medium">
+                        ${midpointPrice ? midpointPrice.toFixed(2) : '-.--'}
+                      </span>
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-[#0d1825] text-xs text-gray-300 rounded border border-gray-800 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                         Midpoint Price
                       </div>
@@ -421,7 +572,9 @@ export default function Home() {
 
                     {/* Last Price */}
                     <div className="relative group">
-                      <span className="text-gray-400 text-sm">$183.65</span>
+                      <span className="text-gray-400 text-sm">
+                        ${lastPrice ? lastPrice.toFixed(2) : '-.--'}
+                      </span>
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-[#0d1825] text-xs text-gray-300 rounded border border-gray-800 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                         Last Price
                       </div>
@@ -432,7 +585,11 @@ export default function Home() {
                   <div className="flex items-center mr-2">
                     {/* Combined Spread */}
                     <div className="relative group">
-                      <span className="text-gray-400 text-sm">$0.02 / 0.0109%</span>
+                      <span className="text-gray-400 text-sm">
+                        {spread 
+                          ? `$${spread.absolute.toFixed(2)} / ${spread.percentage.toFixed(4)}%` 
+                          : '$-.-- / -.---%'}
+                      </span>
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-[#0d1825] text-xs text-gray-300 rounded border border-gray-800 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                         Spread
                       </div>
@@ -441,143 +598,177 @@ export default function Home() {
                 </div>
 
                 {/* Buy Orders Container */}
-                <div className="flex-1 px-2 relative">
+                <div className="flex-1 px-2">
                   {/* Bid Orders */}
-                  <div className="grid grid-cols-3 gap-1 text-sm relative z-10">
-                    <div className="text-green-400">$183.59</div>
-                    <div className="text-center text-gray-300">1,250</div>
-                    <div className="text-right text-gray-300">$229,487.50</div>
-
-                    <div className="text-green-400">$183.57</div>
-                    <div className="text-center text-gray-300">2,500</div>
-                    <div className="text-right text-gray-300">$458,925.00</div>
-
-                    <div className="text-green-400">$183.55</div>
-                    <div className="text-center text-gray-300">3,750</div>
-                    <div className="text-right text-gray-300">$688,312.50</div>
-
-                    <div className="text-green-400">$183.52</div>
-                    <div className="text-center text-gray-300">5,000</div>
-                    <div className="text-right text-gray-300">$917,600.00</div>
-
-                    <div className="text-green-400">$183.48</div>
-                    <div className="text-center text-gray-300">7,500</div>
-                    <div className="text-right text-gray-300">$1,376,100.00</div>
-
-                    <div className="text-green-400">$183.45</div>
-                    <div className="text-center text-gray-300">10,000</div>
-                    <div className="text-right text-gray-300">$1,834,500.00</div>
-
-                    <div className="text-green-400">$183.42</div>
-                    <div className="text-center text-gray-300">12,500</div>
-                    <div className="text-right text-gray-300">$2,292,750.00</div>
-
-                    <div className="text-green-400">$183.38</div>
-                    <div className="text-center text-gray-300">15,000</div>
-                    <div className="text-right text-gray-300">$2,750,700.00</div>
-
-                    <div className="text-green-400">$183.35</div>
-                    <div className="text-center text-gray-300">17,500</div>
-                    <div className="text-right text-gray-300">$3,208,625.00</div>
-
-                    <div className="text-green-400">$183.32</div>
-                    <div className="text-center text-gray-300">20,000</div>
-                    <div className="text-right text-gray-300">$3,666,400.00</div>
-                  </div>
+                  {isClient ? (
+                    <div className="grid grid-cols-3 gap-1 text-sm relative z-10">
+                      {orderbook.bids.map((bid, index) => (
+                        <React.Fragment key={`bid-${index}`}>
+                          <div className="text-green-400">${bid.price.toFixed(2)}</div>
+                          <div className="text-center text-gray-300">
+                            {bid?.quantity ? bid.quantity.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '0'}
+                          </div>
+                          <div className="text-right text-gray-300">
+                            ${bid?.total ? bid.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+                          </div>
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex justify-center items-center h-40">
+                      <p>Loading orderbook...</p>
+                    </div>
+                  )}
                 </div>
+              </div>
             </div>
           </div>
 
           {/* Buy/Sell Widget */}
-            <div style={{ width: '300px' }}>
-              <div className={`bg-[#050d17] rounded-lg shadow-md p-4 border border-gray-900 h-[600px] ${
-                tradeType === 'buy' 
-                  ? 'bg-gradient-to-b from-green-950/10 to-[#050d17]' 
-                  : tradeType === 'sell'
-                    ? 'bg-gradient-to-b from-red-950/10 to-[#050d17]'
-                    : ''
-              }`}>
-                {/* Header Row */}
-                <div className="flex justify-between items-center mb-4 px-2">
-                  {/* Buy/Sell Toggle */}
-                  <div className="flex space-x-4">
-                    <button 
-                      onClick={() => setTradeType('buy')}
-                      className={`text-gray-300 w-12 text-left ${
-                        tradeType === 'buy' 
-                          ? 'font-semibold' 
-                          : 'font-normal'
-                      }`}
-                    >
-                      <span className={`inline-block pb-1 border-b-2 ${
-                        tradeType === 'buy' ? 'border-white' : 'border-transparent'
-                      }`}>
-                        Buy
-                      </span>
-                    </button>
-                    <button 
-                      onClick={() => setTradeType('sell')}
-                      className={`text-gray-300 ${
-                        tradeType === 'sell' 
-                          ? 'font-semibold' 
-                          : 'font-normal'
-                      }`}
-                    >
-                      <span className={`inline-block pb-1 border-b-2 ${
-                        tradeType === 'sell' ? 'border-white' : 'border-transparent'
-                      }`}>
-                        Sell
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* Order Type Dropdown */}
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowAdvancedMenu(!showAdvancedMenu)}
-                      className="flex items-center space-x-2 px-3 py-1 text-gray-400 hover:text-white"
-                    >
-                      <span className="uppercase">{orderType}</span>
-                      <FiChevronDown className={`transform transition-transform ${showAdvancedMenu ? 'rotate-180' : ''}`} />
-                    </button>
-                    
-                    {showAdvancedMenu && (
-                      <div className="absolute top-full right-0 mt-1 w-32 bg-[#0d1825] border border-gray-800 rounded-lg shadow-lg z-10">
-                        {orderTypes.map((type) => (
-                          <button
-                            key={type}
-                            onClick={() => {
-                              if (type === 'market' || type === 'limit') {
-                                setOrderType(type)
-                              }
-                              setShowAdvancedMenu(false)
-                            }}
-                            className="w-full px-3 py-2 text-left text-gray-400 hover:text-white hover:bg-[#161f2c] first:rounded-t-lg last:rounded-b-lg text-sm"
-                          >
-                            {type.charAt(0).toUpperCase() + type.slice(1)}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+          <div style={{ width: '300px' }}>
+            <div className={`bg-[#050d17] rounded-lg shadow-md p-4 border border-gray-900 h-[600px] ${
+              tradeType === 'buy' 
+                ? 'bg-gradient-to-b from-green-950/10 to-[#050d17]' 
+                : tradeType === 'sell'
+                  ? 'bg-gradient-to-b from-red-950/10 to-[#050d17]'
+                  : ''
+            }`}>
+              {/* Header Row */}
+              <div className="flex justify-between items-center mb-4 px-2">
+                {/* Buy/Sell Toggle */}
+                <div className="flex space-x-4">
+                  <button 
+                    onClick={() => setTradeType('buy')}
+                    className={`text-gray-300 w-12 text-left ${
+                      tradeType === 'buy' 
+                        ? 'font-semibold' 
+                        : 'font-normal'
+                    }`}
+                  >
+                    <span className={`inline-block pb-1 border-b-2 ${
+                      tradeType === 'buy' ? 'border-white' : 'border-transparent'
+                    }`}>
+                      Buy
+                    </span>
+                  </button>
+                  <button 
+                    onClick={() => setTradeType('sell')}
+                    className={`text-gray-300 ${
+                      tradeType === 'sell' 
+                        ? 'font-semibold' 
+                        : 'font-normal'
+                    }`}
+                  >
+                    <span className={`inline-block pb-1 border-b-2 ${
+                      tradeType === 'sell' ? 'border-white' : 'border-transparent'
+                    }`}>
+                      Sell
+                    </span>
+                  </button>
                 </div>
 
-                {/* Horizontal Divider */}
-                <div className="w-full h-px bg-gray-800 mb-4"></div>
+                {/* Order Type Dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowAdvancedMenu(!showAdvancedMenu)}
+                    className="flex items-center space-x-2 px-3 py-1 text-gray-400 hover:text-white"
+                  >
+                    <span className="uppercase">{orderType}</span>
+                    <FiChevronDown className={`transform transition-transform ${showAdvancedMenu ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {showAdvancedMenu && (
+                    <div className="absolute top-full right-0 mt-1 w-32 bg-[#0d1825] border border-gray-800 rounded-lg shadow-lg z-10">
+                      {orderTypes.map((type) => (
+                        <button
+                          key={type}
+                          onClick={() => {
+                            if (type === 'market' || type === 'limit') {
+                              setOrderType(type)
+                            }
+                            setShowAdvancedMenu(false)
+                          }}
+                          className="w-full px-3 py-2 text-left text-gray-400 hover:text-white hover:bg-[#161f2c] first:rounded-t-lg last:rounded-b-lg text-sm"
+                        >
+                          {type.charAt(0).toUpperCase() + type.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
 
-                <div className="flex flex-col h-[500px]">
-                  {/* Size/Limit Input Section */}
-                  <div className="mb-4 px-2">
-                    {orderType === 'market' ? (
-                      <>
-                        <div className="text-gray-400 text-sm mb-2">Size</div>
-                        <div className="flex flex-col gap-2 mb-4">
-                          {/* NMA Input */}
+              {/* Horizontal Divider */}
+              <div className="w-full h-px bg-gray-800 mb-4"></div>
+
+              <div className="flex flex-col h-[500px]">
+                {/* Size/Limit Input Section */}
+                <div className="mb-4 px-2">
+                  {orderType === 'market' ? (
+                    <>
+                      <div className="text-gray-400 text-sm mb-2">Size</div>
+                      <div className="flex flex-col gap-2 mb-4">
+                        {/* NMA Input */}
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={sizeNMA}
+                            onChange={(e) => handleNMAChange(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
+                                     bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
+                            placeholder="0.0000"
+                          />
+                          <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
+                            NMA
+                          </span>
+                        </div>
+
+                        {/* USD Input */}
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={sizeUSD}
+                            onChange={(e) => handleUSDChange(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
+                                     bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
+                            placeholder="0.00"
+                          />
+                          <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
+                            USD
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Limit Price Input */}
+                      <div className="mb-4">
+                        <div className="text-gray-400 text-sm mb-2">Limit Price</div>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={limitPrice}
+                            onChange={(e) => handleLimitPriceChange(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
+                                     bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
+                            placeholder="0.00"
+                          />
+                          <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
+                            USD
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Quantity and Total Inputs */}
+                      <div className="flex gap-2 mb-4">
+                        {/* Quantity Input */}
+                        <div className="flex-1">
+                          <div className="text-gray-400 text-sm mb-2">Quantity</div>
                           <div className="relative">
                             <input
                               type="text"
-                              value={sizeNMA}
-                              onChange={(e) => handleNMAChange(e.target.value)}
+                              value={limitQuantity}
+                              onChange={(e) => handleLimitQuantityChange(e.target.value)}
                               className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
                                        bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
                               placeholder="0.0000"
@@ -586,13 +777,16 @@ export default function Home() {
                               NMA
                             </span>
                           </div>
+                        </div>
 
-                          {/* USD Input */}
+                        {/* Total Input */}
+                        <div className="flex-1">
+                          <div className="text-gray-400 text-sm mb-2">Total</div>
                           <div className="relative">
                             <input
                               type="text"
-                              value={sizeUSD}
-                              onChange={(e) => handleUSDChange(e.target.value)}
+                              value={limitTotal}
+                              onChange={(e) => handleLimitTotalChange(e.target.value)}
                               className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
                                        bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
                               placeholder="0.00"
@@ -602,140 +796,81 @@ export default function Home() {
                             </span>
                           </div>
                         </div>
-                      </>
-                    ) : (
-                      <>
-                        {/* Limit Price Input */}
-                        <div className="mb-4">
-                          <div className="text-gray-400 text-sm mb-2">Limit Price</div>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              value={limitPrice}
-                              onChange={(e) => handleLimitPriceChange(e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
-                                       bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
-                              placeholder="0.00"
-                            />
-                            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
-                              USD
-                            </span>
-                          </div>
-                        </div>
+                      </div>
+                    </>
+                  )}
 
-                        {/* Quantity and Total Inputs */}
-                        <div className="flex gap-2 mb-4">
-                          {/* Quantity Input */}
-                          <div className="flex-1">
-                            <div className="text-gray-400 text-sm mb-2">Quantity</div>
-                            <div className="relative">
-                              <input
-                                type="text"
-                                value={limitQuantity}
-                                onChange={(e) => handleLimitQuantityChange(e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
-                                         bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
-                                placeholder="0.0000"
-                              />
-                              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
-                                NMA
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Total Input */}
-                          <div className="flex-1">
-                            <div className="text-gray-400 text-sm mb-2">Total</div>
-                            <div className="relative">
-                              <input
-                                type="text"
-                                value={limitTotal}
-                                onChange={(e) => handleLimitTotalChange(e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
-                                         bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
-                                placeholder="0.00"
-                              />
-                              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
-                                USD
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    )}
-
-                    {/* TP/SL Toggle */}
-                    <div className="flex items-center">
-                      <span className="text-gray-400 text-sm mr-2">TP/SL</span>
-                      <button
-                        onClick={() => setTpslEnabled(!tpslEnabled)}
-                        className={`w-4 h-4 rounded-full border transition-colors ${
-                          tpslEnabled
-                            ? 'bg-blue-500 border-blue-500'
-                            : 'border-gray-600 hover:border-gray-500'
-                        }`}
-                      >
-                        {tpslEnabled && (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                          </div>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mt-auto px-2">
-                    {/* Buy/Sell Button */}
-                    <button 
-                      onClick={handleOrderSubmit}
-                      className={`w-full py-3 rounded-lg font-semibold text-white ${
-                        orderType === 'market' ? 'mb-4' : 'mb-3'
-                      } ${
-                        !isAuthenticated
-                          ? 'bg-blue-600 hover:bg-blue-700 border border-blue-500'
-                          : tradeType === 'buy' 
-                            ? 'bg-[#16a34a]/90 hover:bg-[#15803d]/90 border border-[#16a34a]' 
-                            : 'bg-red-600 hover:bg-red-700'
-                      } transition-colors`}
+                  {/* TP/SL Toggle */}
+                  <div className="flex items-center">
+                    <span className="text-gray-400 text-sm mr-2">TP/SL</span>
+                    <button
+                      onClick={() => setTpslEnabled(!tpslEnabled)}
+                      className={`w-4 h-4 rounded-full border transition-colors ${
+                        tpslEnabled
+                          ? 'bg-blue-500 border-blue-500'
+                          : 'border-gray-600 hover:border-gray-500'
+                      }`}
                     >
-                      {isAuthenticated 
-                        ? `${tradeType === 'buy' ? 'Buy' : 'Sell'} NMA` 
-                        : 'Sign in to Trade'}
-                    </button>
-
-                    {/* Order Details */}
-                    <div className="border border-gray-800 rounded-lg p-3 text-sm space-y-2">
-                      {/* Order Value */}
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Order Value</span>
-                        <span className="text-gray-300">
-                          ${formatNumber((parseFloat(orderType === 'market' ? sizeUSD : limitTotal || '0') + 
-                            calculateFees(orderType === 'market' ? sizeUSD : limitTotal)).toString(), true)}
-                        </span>
-                      </div>
-
-                      {/* Fees */}
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Fees</span>
-                        <span className="text-gray-300">
-                          ${formatNumber(calculateFees(orderType === 'market' ? sizeUSD : limitTotal).toString(), true)}
-                        </span>
-                      </div>
-
-                      {/* Fee Rates */}
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Fee Rates</span>
-                        <span className="text-gray-300">0.05% / 0.10%</span>
-                      </div>
-
-                      {/* Slippage - Only show for market orders */}
-                      {orderType === 'market' && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Slippage</span>
-                          <span className="text-blue-400">Est: 0.0036% / Max: 8.00%</span>
+                      {tpslEnabled && (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                         </div>
                       )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-auto px-2">
+                  {/* Buy/Sell Button */}
+                  <button 
+                    onClick={handleOrderSubmit}
+                    className={`w-full py-3 rounded-lg font-semibold text-white ${
+                      orderType === 'market' ? 'mb-4' : 'mb-3'
+                    } ${
+                      !isAuthenticated
+                        ? 'bg-blue-600 hover:bg-blue-700 border border-blue-500'
+                        : tradeType === 'buy' 
+                          ? 'bg-[#16a34a]/90 hover:bg-[#15803d]/90 border border-[#16a34a]' 
+                          : 'bg-red-600 hover:bg-red-700'
+                    } transition-colors`}
+                  >
+                    {isAuthenticated 
+                      ? `${tradeType === 'buy' ? 'Buy' : 'Sell'} NMA` 
+                      : 'Sign in to Trade'}
+                  </button>
+
+                  {/* Order Details */}
+                  <div className="border border-gray-800 rounded-lg p-3 text-sm space-y-2">
+                    {/* Order Value */}
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Order Value</span>
+                      <span className="text-gray-300">
+                        ${formatNumber((parseFloat(orderType === 'market' ? sizeUSD : limitTotal || '0') + 
+                          calculateFees(orderType === 'market' ? sizeUSD : limitTotal)).toString(), true)}
+                      </span>
                     </div>
+
+                    {/* Fees */}
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Fees</span>
+                      <span className="text-gray-300">
+                        ${formatNumber(calculateFees(orderType === 'market' ? sizeUSD : limitTotal).toString(), true)}
+                      </span>
+                    </div>
+
+                    {/* Fee Rates */}
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Fee Rates</span>
+                      <span className="text-gray-300">0.05% / 0.10%</span>
+                    </div>
+
+                    {/* Slippage - Only show for market orders */}
+                    {orderType === 'market' && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Slippage</span>
+                        <span className="text-blue-400">Est: 0.0036% / Max: 8.00%</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -790,206 +925,89 @@ export default function Home() {
             </button>
           </div>
           {/* Positions Widget Content */}
-          {positionsTab === 'orders' ? (
-            // Orders Table
-            <div className="text-sm mt-4">
-              {/* Table Header */}
-              <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-gray-400 border-b border-gray-800 pb-3">
-                <div className="pl-[12px]">Market</div>
-                <div className="pl-0">Side</div>
-                <div className="pl-0">Type</div>
-                <div className="pl-[12px]">Current Price</div>
-                <div className="pl-[12px]">Limit Price</div>
-                <div className="pl-0">Quantity</div>
-                <div className="pl-[12px]">Total</div>
-                <div className="pl-[52px]">Status</div>
-                <div className="pl-[12px]">Time</div>
-                <div className="pl-0"></div>
-              </div>
-
-              {/* Table Content */}
-              <div className="text-gray-300 pt-3 h-[400px]">
-                <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-sm border-b border-gray-800/50 py-2">
-                  <div>NMA</div>
-                  <div><span className="text-green-400">Buy</span></div>
-                  <div>Limit</div>
-                  <div>$183.65</div>
-                  <div>$183.75</div>
-                  <div>5,000</div>
-                  <div>$918,750.00</div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '45%' }}></div>
-                    </div>
-                    <span>45%</span>
-                  </div>
-                  <div>03/14/24 20:24:33</div>
-                  <div className="flex gap-2">
-                    <button className="text-gray-400 hover:text-blue-400 transition-colors">
-                      <FiEdit2 className="w-4 h-4" />
-                    </button>
-                    <button className="text-gray-400 hover:text-red-400 transition-colors">
-                      <FiX className="w-4 h-4" />
-                    </button>
-                  </div>
+          {isClient ? (
+            positionsTab === 'orders' ? (
+              // Orders Table
+              <div className="text-sm mt-4">
+                {/* Table Header */}
+                <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-gray-400 border-b border-gray-800 pb-3">
+                  <div className="pl-[12px]">Market</div>
+                  <div className="pl-0">Side</div>
+                  <div className="pl-0">Type</div>
+                  <div className="pl-[12px]">Current Price</div>
+                  <div className="pl-[12px]">Limit Price</div>
+                  <div className="pl-0">Quantity</div>
+                  <div className="pl-[12px]">Total</div>
+                  <div className="pl-[52px]">Status</div>
+                  <div className="pl-[12px]">Time</div>
+                  <div className="pl-0"></div>
                 </div>
 
-                <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-sm border-b border-gray-800/50 py-2">
-                  <div>NMA</div>
-                  <div><span className="text-red-400">Sell</span></div>
-                  <div>Limit</div>
-                  <div>$183.65</div>
-                  <div>$183.55</div>
-                  <div>2,500</div>
-                  <div>$458,875.00</div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '78%' }}></div>
+                {/* Table Content */}
+                <div className="text-gray-300 pt-3 h-[400px]">
+                  {orderbook.asks.map((ask, index) => (
+                    <div key={index} className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-sm border-b border-gray-800/50 py-2">
+                      <div>NMA</div>
+                      <div><span className="text-red-400">Sell</span></div>
+                      <div>Limit</div>
+                      <div>{ask?.price ? formatNumber(ask.price.toFixed(4), true) : '0.0000'}</div>
+                      <div>{ask?.price ? formatNumber(ask.price.toFixed(4), true) : '0.0000'}</div>
+                      <div>{ask?.quantity ? ask.quantity.toFixed(4) : '0.0000'}</div>
+                      <div>{ask?.total ? ask.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${ask?.quantity ? (ask.quantity / 10000) * 100 : 0}%` }}></div>
+                        </div>
+                        <span>{ask?.quantity ? ((ask.quantity / 10000) * 100).toFixed(2) : '0.00'}%</span>
+                      </div>
+                      <div>-</div>
+                      <div className="flex gap-2">
+                        <button className="text-gray-400 hover:text-blue-400 transition-colors">
+                          <FiEdit2 className="w-4 h-4" />
+                        </button>
+                        <button className="text-gray-400 hover:text-red-400 transition-colors">
+                          <FiX className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <span>78%</span>
-                  </div>
-                  <div>03/14/24 20:23:15</div>
-                  <div className="flex gap-2">
-                    <button className="text-gray-400 hover:text-blue-400 transition-colors">
-                      <FiEdit2 className="w-4 h-4" />
-                    </button>
-                    <button className="text-gray-400 hover:text-red-400 transition-colors">
-                      <FiX className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
+                  ))}
 
-                <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-sm border-b border-gray-800/50 py-2">
-                  <div>NMA</div>
-                  <div><span className="text-green-400">Buy</span></div>
-                  <div>Limit</div>
-                  <div>$183.65</div>
-                  <div>$183.70</div>
-                  <div>3,750</div>
-                  <div>$688,875.00</div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '32%' }}></div>
+                  {orderbook.bids.map((bid, index) => (
+                    <div key={index} className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-sm border-b border-gray-800/50 py-2">
+                      <div>NMA</div>
+                      <div><span className="text-green-400">Buy</span></div>
+                      <div>Limit</div>
+                      <div>{formatNumber(bid.price.toFixed(4), true)}</div>
+                      <div>{formatNumber(bid.price.toFixed(4), true)}</div>
+                      <div>{bid?.quantity ? bid.quantity.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '0'}</div>
+                      <div>{bid?.total ? bid.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(bid?.quantity / 10000) * 100}%` }}></div>
+                        </div>
+                        <span>{((bid?.quantity / 10000) * 100).toFixed(2)}%</span>
+                      </div>
+                      <div>03/14/24 20:23:15</div>
+                      <div className="flex gap-2">
+                        <button className="text-gray-400 hover:text-blue-400 transition-colors">
+                          <FiEdit2 className="w-4 h-4" />
+                        </button>
+                        <button className="text-gray-400 hover:text-red-400 transition-colors">
+                          <FiX className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <span>32%</span>
-                  </div>
-                  <div>03/14/24 20:22:48</div>
-                  <div className="flex gap-2">
-                    <button className="text-gray-400 hover:text-blue-400 transition-colors">
-                      <FiEdit2 className="w-4 h-4" />
-                    </button>
-                    <button className="text-gray-400 hover:text-red-400 transition-colors">
-                      <FiX className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-sm border-b border-gray-800/50 py-2">
-                  <div>NMA</div>
-                  <div><span className="text-red-400">Sell</span></div>
-                  <div>Limit</div>
-                  <div>$183.65</div>
-                  <div>$183.58</div>
-                  <div>4,200</div>
-                  <div>$771,036.00</div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '65%' }}></div>
-                    </div>
-                    <span>65%</span>
-                  </div>
-                  <div>03/14/24 20:22:12</div>
-                  <div className="flex gap-2">
-                    <button className="text-gray-400 hover:text-blue-400 transition-colors">
-                      <FiEdit2 className="w-4 h-4" />
-                    </button>
-                    <button className="text-gray-400 hover:text-red-400 transition-colors">
-                      <FiX className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-sm border-b border-gray-800/50 py-2">
-                  <div>NMA</div>
-                  <div><span className="text-green-400">Buy</span></div>
-                  <div>Limit</div>
-                  <div>$183.65</div>
-                  <div>$183.72</div>
-                  <div>1,800</div>
-                  <div>$330,696.00</div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '25%' }}></div>
-                    </div>
-                    <span>25%</span>
-                  </div>
-                  <div>03/14/24 20:21:55</div>
-                  <div className="flex gap-2">
-                    <button className="text-gray-400 hover:text-blue-400 transition-colors">
-                      <FiEdit2 className="w-4 h-4" />
-                    </button>
-                    <button className="text-gray-400 hover:text-red-400 transition-colors">
-                      <FiX className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-sm border-b border-gray-800/50 py-2">
-                  <div>NMA</div>
-                  <div><span className="text-red-400">Sell</span></div>
-                  <div>Limit</div>
-                  <div>$183.65</div>
-                  <div>$183.52</div>
-                  <div>3,300</div>
-                  <div>$605,616.00</div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '92%' }}></div>
-                    </div>
-                    <span>92%</span>
-                  </div>
-                  <div>03/14/24 20:21:33</div>
-                  <div className="flex gap-2">
-                    <button className="text-gray-400 hover:text-blue-400 transition-colors">
-                      <FiEdit2 className="w-4 h-4" />
-                    </button>
-                    <button className="text-gray-400 hover:text-red-400 transition-colors">
-                      <FiX className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_1.5fr_1fr_1.5fr_2fr_1.5fr_auto] gap-4 text-sm border-b border-gray-800/50 py-2">
-                  <div>NMA</div>
-                  <div><span className="text-green-400">Buy</span></div>
-                  <div>Limit</div>
-                  <div>$183.65</div>
-                  <div>$183.68</div>
-                  <div>2,900</div>
-                  <div>$532,672.00</div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 bg-gray-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '15%' }}></div>
-                    </div>
-                    <span>15%</span>
-                  </div>
-                  <div>03/14/24 20:21:09</div>
-                  <div className="flex gap-2">
-                    <button className="text-gray-400 hover:text-blue-400 transition-colors">
-                      <FiEdit2 className="w-4 h-4" />
-                    </button>
-                    <button className="text-gray-400 hover:text-red-400 transition-colors">
-                      <FiX className="w-4 h-4" />
-                    </button>
-                  </div>
+                  ))}
                 </div>
               </div>
-            </div>
+            ) : (
+              // Placeholder for other tabs
+              <div className="text-gray-500 flex items-center justify-center h-[400px] border border-gray-900 rounded-lg">
+                {`${positionsTab.charAt(0).toUpperCase() + positionsTab.slice(1)} Placeholder`}
+              </div>
+            )
           ) : (
-            // Placeholder for other tabs
-            <div className="text-gray-500 flex items-center justify-center h-[400px] border border-gray-900 rounded-lg">
-              {`${positionsTab.charAt(0).toUpperCase() + positionsTab.slice(1)} Placeholder`}
-            </div>
+            <div className="loading-placeholder">Loading...</div>
           )}
         </div>
       </div>
