@@ -104,78 +104,103 @@ export class OrderbookService {
     }
   }
 
-  protected async signOrder(order: OrderPayload, privateKey: string): Promise<string> {
-    this.validateOrder(order);
-    const wallet = new ethers.Wallet(privateKey);
+  protected async signOrder(order: any, privateKey: string): Promise<OrderPayload> {
+    // Ensure all required fields are present and properly formatted
+    const now = Math.floor(Date.now() / 1000);
     
-    const signature = await wallet.signTypedData(
-      ORDERBOOK_DOMAIN,
-      { Order: ORDER_TYPE.Order },
-      {
-        book_id: order.book_id,
-        price: order.price,
-        quantity: order.quantity,
-        trader: order.trader,
-        nonce: order.nonce,
-        expiry: order.expiry
-      }
-    );
-
-    return signature;
+    // Create a properly formatted order with all required fields
+    const formattedOrder = {
+      book_id: order.book_id || 'NMA-USD',
+      // Convert price to a proper number format
+      price: order.type === 'buy' ? Math.abs(order.price || 0) : -Math.abs(order.price || 0),
+      quantity: Math.floor(order.quantity || 0),
+      trader: order.trader,
+      nonce: order.nonce || now,
+      expiry: order.expiry || (now + 3600) // Default 1 hour expiry
+    };
+    
+    console.log('Signing order with data:', formattedOrder);
+    
+    try {
+      const wallet = new ethers.Wallet(privateKey);
+      
+      const signature = await wallet.signTypedData(
+        ORDERBOOK_DOMAIN,
+        { Order: ORDER_TYPE.Order },
+        {
+          book_id: formattedOrder.book_id,
+          price: formattedOrder.price,
+          quantity: formattedOrder.quantity,
+          trader: formattedOrder.trader,
+          nonce: formattedOrder.nonce,
+          expiry: formattedOrder.expiry
+        }
+      );
+      
+      // Return the complete order payload with signature
+      return {
+        ...formattedOrder,
+        signature
+      };
+    } catch (error) {
+      console.error('Error signing order:', error);
+      throw error;
+    }
   }
 
-  async submitOrder(order: {
-    book_id: string;
-    type: 'buy' | 'sell';
-    order_type: 'market' | 'limit';
-    quantity: number;
-    price?: number;
-    total: number;
-    trader: string;
-  }): Promise<OrderResponse> {
+  async submitOrder(orderData: any, privateKey: string): Promise<any> {
     try {
-      const price = order.price || 0;
-      const signedPrice = order.type === 'sell' ? -Math.abs(price) : Math.abs(price);
-      const now = Math.floor(Date.now() / 1000);
-
-      const payload: OrderPayload = {
-        book_id: order.book_id,
-        price: signedPrice,
-        quantity: order.quantity,
-        trader: order.trader,
-        nonce: now,
-        expiry: now + 3600, // 1 hour expiry
-        signature: '' // Will be set after signing
-      };
-
-      // Get private key from backend
-      const keyResponse = await fetch('/api/user/private-key', {
-        credentials: 'include'
-      });
-      if (!keyResponse.ok) {
-        throw new Error('Failed to get private key');
+      // Use the provided private key for signing
+      if (!privateKey) {
+        throw new Error('Private key is required for signing orders');
       }
-      const { private_key } = await keyResponse.json();
-
-      // Sign the order (includes validation)
-      const signature = await this.signOrder(payload, private_key);
-      payload.signature = signature;
-
+      
+      // Prepare the order data based on order type
+      let orderToSign;
+      
+      if (orderData.order_type === 'market') {
+        // Market order
+        orderToSign = {
+          book_id: orderData.book_id,
+          type: orderData.type,
+          trader: orderData.trader,
+          quantity: parseFloat(orderData.quantity),
+          // For market orders, we don't specify price
+          price: 0
+        };
+      } else {
+        // Limit order
+        orderToSign = {
+          book_id: orderData.book_id,
+          type: orderData.type,
+          trader: orderData.trader,
+          quantity: parseFloat(orderData.quantity),
+          price: parseFloat(orderData.price)
+        };
+      }
+      
+      console.log('Preparing to sign order:', orderToSign);
+      
+      // Sign the order with the private key
+      const signedOrder = await this.signOrder(orderToSign, privateKey);
+      
+      console.log('Order signed successfully:', signedOrder);
+      
+      // Submit the signed order
       const response = await fetch(`${this.baseUrl}/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(signedOrder),
       });
-
-      const data: OrderResponse = await response.json();
       
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || `HTTP error! status: ${response.status}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! Status: ${response.status}, Details: ${errorText}`);
       }
-
-      return data;
+      
+      return await response.json();
     } catch (error) {
       console.error('Error submitting order:', error);
       throw error;

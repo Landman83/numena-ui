@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { OrderbookService } from '@/services/orderbook';
 import React from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Home() {
   const router = useRouter()
@@ -26,8 +27,7 @@ export default function Home() {
   const [limitTotal, setLimitTotal] = useState<string>('')
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const orderbookService = new OrderbookService();
-  const [userWallet, setUserWallet] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { isAuthenticated, userWallet, checkAuthStatus, getPrivateKey } = useAuth();
 
   // Add new state for orderbook data
   const [orderbook, setOrderbook] = useState<{
@@ -44,6 +44,9 @@ export default function Home() {
 
   // Add this state to control client-side rendering
   const [isClient, setIsClient] = useState(false);
+
+  // Add this state to properly handle client-side rendering
+  const [mounted, setMounted] = useState(false);
 
   const advancedOrders = [
     'Stop Loss',
@@ -147,26 +150,17 @@ export default function Home() {
     router.push('/signin')
   }
 
-  // Update useEffect to only set authentication status
+  // Move the authentication check to a separate useEffect that runs after mounting
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        const response = await fetch('/api/user/me', {
-          credentials: 'include'
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setUserWallet(data.wallet_address);
-          setIsAuthenticated(true);
-        }
-      } catch (error) {
-        console.error('Error fetching user profile:', error);
-        setIsAuthenticated(false);
-      }
-    };
-
-    fetchUserProfile();
+    setMounted(true);
   }, []);
+  
+  // Update the authentication useEffect to be more robust
+  useEffect(() => {
+    if (mounted) {
+      checkAuthStatus();
+    }
+  }, [mounted, checkAuthStatus]);
 
   // Set client-side rendering flag
   useEffect(() => {
@@ -318,22 +312,29 @@ export default function Home() {
 
   const handleOrderSubmit = async () => {
     if (!isAuthenticated) {
-      // Redirect to sign in page if not authenticated
-      router.push('/signin');
+      console.log('Please sign in to trade');
+      alert('Please sign in to trade');
       return;
     }
 
     if (!userWallet) {
       console.error('No wallet address available');
+      alert('No wallet address available. Please sign in again.');
       return;
     }
 
     try {
+      // Get the private key
+      const privateKey = await getPrivateKey();
+      if (!privateKey) {
+        throw new Error('Failed to get private key');
+      }
+      
       const orderData = {
         book_id: 'NMA-USD',
         type: tradeType,
         order_type: orderType,
-        trader: userWallet,  // Add wallet address
+        trader: userWallet,
         ...(orderType === 'market' 
           ? {
               quantity: parseFloat(sizeNMA),
@@ -347,15 +348,14 @@ export default function Home() {
         ),
       };
 
-      const response = await orderbookService.submitOrder(orderData);
+      // Pass the private key to the submitOrder method
+      const response = await orderbookService.submitOrder(orderData, privateKey);
       console.log('Order submitted successfully:', response);
-      
-      // TODO: Add success notification
-      // TODO: Clear form or update UI as needed
+      alert('Order submitted successfully!');
       
     } catch (error) {
       console.error('Failed to submit order:', error);
-      // TODO: Add error notification
+      alert('Failed to submit order. Please try again.');
     }
   }
 
@@ -364,6 +364,19 @@ export default function Home() {
     if (!date) return '';
     return date.toLocaleString();
   };
+
+  // Add this debugging code to see the authentication state
+  useEffect(() => {
+    console.log('Authentication state changed:', isAuthenticated);
+    console.log('User wallet:', userWallet);
+  }, [isAuthenticated, userWallet]);
+
+  // Wrap your JSX with a conditional to prevent rendering until mounted
+  if (!mounted) {
+    return <div className="flex min-h-screen items-center justify-center">
+      <p className="text-gray-500">Loading...</p>
+    </div>;
+  }
 
   return (
     <main className="flex min-h-screen flex-col w-full">
@@ -824,16 +837,12 @@ export default function Home() {
                       className={`w-full py-3 rounded-lg font-semibold text-white ${
                         orderType === 'market' ? 'mb-4' : 'mb-3'
                       } ${
-                        !isAuthenticated
-                          ? 'bg-blue-600 hover:bg-blue-700 border border-blue-500'
-                          : tradeType === 'buy' 
-                            ? 'bg-[#16a34a]/90 hover:bg-[#15803d]/90 border border-[#16a34a]' 
-                            : 'bg-red-600 hover:bg-red-700'
+                        tradeType === 'buy' 
+                          ? 'bg-[#16a34a]/90 hover:bg-[#15803d]/90 border border-[#16a34a]' 
+                          : 'bg-red-600 hover:bg-red-700'
                       } transition-colors`}
                     >
-                      {isAuthenticated 
-                        ? `${tradeType === 'buy' ? 'Buy' : 'Sell'} NMA` 
-                        : 'Sign in to Trade'}
+                      {`${tradeType === 'buy' ? 'Buy' : 'Sell'} NMA`}
                     </button>
 
                     {/* Order Details */}
@@ -1044,6 +1053,12 @@ export default function Home() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Also add a debug display in the component to verify the state */}
+      <div className="text-xs text-gray-500 mt-1 mb-2">
+        Debug: {isAuthenticated ? 'Authenticated' : 'Not authenticated'} | 
+        Wallet: {userWallet || 'None'}
       </div>
     </main>
   );

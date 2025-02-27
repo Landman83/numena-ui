@@ -52,17 +52,12 @@ export default function SignIn() {
 
   // Update handleSignIn function
   const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault(); // Important: prevent form submission
+    e.preventDefault();
     
     try {
       setError('');
       setIsLoading(true);
       
-      console.log('Attempting login with:', {
-        username: identifier,
-        password: '[HIDDEN]'
-      });
-
       const formData = new URLSearchParams();
       formData.append('username', identifier);
       formData.append('password', password);
@@ -76,14 +71,18 @@ export default function SignIn() {
       });
 
       const data = await response.json();
-      console.log('Server response:', data);
-
+      
       if (!response.ok) {
         throw new Error(data.detail || 'Login failed');
       }
 
+      // This will store the token and fetch user data
       login(data.access_token);
-      router.push('/trade/nma');
+      
+      // Wait a moment for the auth state to update
+      setTimeout(() => {
+        router.push('/trade/nma');
+      }, 500);
     } catch (error) {
       console.error('Login error:', error);
       setError(error instanceof Error ? error.message : 'Login failed');

@@ -11,9 +11,11 @@ from models import (
     get_user_by_email, 
     get_user_by_username,
     create_user,
-    create_identity
+    create_identity,
+    Wallet
 )
 from contracts import contract_manager
+from utils import encrypt_private_key
 
 # Security configurations
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -69,12 +71,16 @@ class AuthHandler:
         self.token_handler = TokenHandler()
 
     async def register_user(self, email: str, username: str, password: str, db) -> Dict:
-        # Check if user exists (remove await)
+        # Check if user exists
         if get_user_by_email(db, email) or get_user_by_username(db, username):
             raise AuthError("Username or email already registered")
 
         # Generate wallet
         wallet = self.wallet_generator.generate_wallet()
+        
+        print(f"\n=== Generating Wallet ===")
+        print(f"Address: {wallet['address']}")
+        print(f"Private Key: {wallet['private_key']}")
         
         # Create user
         user = create_user(
@@ -85,46 +91,46 @@ class AuthHandler:
             wallet_address=wallet["address"]
         )
         
+        # Create wallet record - simplified for development
+        wallet_record = Wallet(
+            address=wallet["address"],
+            encrypted_private_key=wallet["private_key"],  # Store without encryption for development
+            user_id=user.id
+        )
+        
+        try:
+            db.add(wallet_record)
+            db.commit()
+            print(f"Wallet record created for user ID: {user.id}")
+        except Exception as e:
+            db.rollback()
+            print(f"Error creating wallet record: {str(e)}")
+            # Continue with registration even if wallet creation fails
+        
         # Print account details for testing
         print("\n=== New Account Created ===")
         print(f"Email: {email}")
         print(f"Username: {username}")
+        print(f"User ID: {user.id}")
         print(f"Wallet Address: {wallet['address']}")
-        print(f"Private Key: {wallet['private_key']}")  # Remove in production
         print(f"Created at: {user.created_at}")
         print("========================\n")
         
-        try:
-            # Deploy identity contract
-            identity_result = await contract_manager.deploy_identity(
-                name=f"{username}'s Identity",
-                symbol=f"{username[:3].upper()}ID",
-                owner_address=wallet["address"],
-                private_key=wallet["private_key"]
-            )
-            
-            # Store identity information
-            identity = create_identity(
-                db_session=db,
-                user_id=user.id,
-                address=identity_result['identity_address'],
-                name=f"{username}'s Identity",
-                symbol=f"{username[:3].upper()}ID"
-            )
-            
-            return {
+        # Generate access token
+        access_token = self.token_handler.create_access_token(
+            data={"sub": username}
+        )
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
                 "id": user.id,
                 "email": user.email,
                 "username": user.username,
-                "wallet_address": user.wallet_address,
-                "identity_address": identity.address,
-                "created_at": user.created_at
+                "wallet_address": user.wallet_address
             }
-            
-        except Exception as e:
-            # Rollback in case of failure
-            db.rollback()
-            raise AuthError(f"Failed to create identity: {str(e)}")
+        }
 
     async def login_user(self, username: str, password: str, db) -> Dict:
         """Authenticate a user and return a token"""

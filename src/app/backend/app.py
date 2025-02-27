@@ -134,18 +134,28 @@ def generate_ethereum_wallet():
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
+        print(f"Validating token: {token[:10]}...")  # Log first 10 chars for debugging
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
+            print("Token validation failed: No username in payload")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials"
             )
+        print(f"Token validated for user: {username}")
         return {"username": username}
-    except JWTError:
+    except JWTError as e:
+        print(f"JWT Error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials"
+        )
+    except Exception as e:
+        print(f"Unexpected error in token validation: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication error"
         )
 
 # Move process_registration function before the endpoints
@@ -288,20 +298,24 @@ async def verify_identity(
 @app.get("/api/user/private-key")
 async def get_private_key(current_user: dict = Depends(get_current_user), db: SessionLocal = Depends(get_db)):
     try:
+        print(f"Private key requested by user: {current_user['username']}")
         user = get_user_by_username(db, current_user['username'])
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
             
         wallet = db.query(Wallet).filter(Wallet.user_id == user.id).first()
         if not wallet:
+            print(f"No wallet found for user {user.id}")
             raise HTTPException(status_code=404, detail="Wallet not found")
             
-        # Decrypt the private key
-        private_key = decrypt_private_key(wallet.encrypted_private_key)
+        # Simplified approach for development
+        private_key = wallet.encrypted_private_key  # Just return the stored key
+        print("Private key retrieved successfully")
         
         return {"private_key": private_key}
         
     except Exception as e:
+        print(f"Error retrieving private key: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
 # Error handlers

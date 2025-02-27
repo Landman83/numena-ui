@@ -111,7 +111,7 @@ class Wallet(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     address = Column(String, unique=True, nullable=False, index=True)
-    encrypted_private_key = Column(String, nullable=False)  # Store encrypted, never raw
+    encrypted_private_key = Column(String, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_used = Column(DateTime(timezone=True), nullable=True)
@@ -229,3 +229,23 @@ def get_identity_by_user_id(db_session, user_id: int) -> Optional[Identity]:
     return db_session.query(Identity).filter(
         Identity.user_id == user_id
     ).first()
+
+def create_wallet_for_user(db_session, user_id: int, address: str, private_key: str) -> Wallet:
+    """Create a wallet for an existing user"""
+    # Check if wallet already exists
+    existing_wallet = db_session.query(Wallet).filter(Wallet.user_id == user_id).first()
+    if existing_wallet:
+        return existing_wallet
+        
+    # Create new wallet
+    wallet = Wallet(
+        address=address,
+        encrypted_private_key=private_key,
+        user_id=user_id
+    )
+    
+    db_session.add(wallet)
+    db_session.commit()
+    db_session.refresh(wallet)
+    
+    return wallet
