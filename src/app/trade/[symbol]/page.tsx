@@ -167,148 +167,128 @@ export default function Home() {
     setIsClient(true);
   }, []);
 
-  // Update WebSocket connection
+  // Add or update the WebSocket connection code
   useEffect(() => {
-    if (!isClient) return; // Only run on client
+    if (!mounted) return;
     
-    const symbol = window.location.pathname.split('/').pop() || 'nma';
-    const bookId = symbol.toUpperCase() + '-USD';
-    
-    // Always fetch initial data via REST
-    fetchOrderbookREST(bookId);
-    
-    // Set up polling as fallback
-    const intervalId = setInterval(() => {
-      fetchOrderbookREST(bookId);
-    }, 1000);
-    
-    // Try WebSocket connection with proper URL
     let ws: WebSocket | null = null;
-    try {
-      // Use the direct WebSocket URL (not through Next.js rewrites)
-      console.log('Attempting WebSocket connection...');
-      ws = new WebSocket(`ws://127.0.0.1:8080/api/books/${bookId}/ws`);
+    
+    const connectWebSocket = () => {
+      console.log('Connecting to orderbook WebSocket...');
+      ws = new WebSocket('ws://localhost:8080/api/ws/orderbook/NMA-USD');
       
-      // Add event listeners with better error handling
       ws.onopen = () => {
-        console.log('WebSocket connected successfully');
-        clearInterval(intervalId); // Stop polling if WebSocket works
+        console.log('WebSocket connection established');
         setWsConnected(true);
       };
       
       ws.onmessage = (event) => {
-        console.log('WebSocket message received:', event.data);
         try {
           const data = JSON.parse(event.data);
-          processOrderbookData(data);
+          console.log('WebSocket message received:', data);
+          
+          if (data.type === 'orderbook_update') {
+            // Update the orderbook state
+            setOrderbook(data.data);
+            
+            // Calculate midpoint price and spread
+            if (data.data.bids.length > 0 && data.data.asks.length > 0) {
+              const bestBid = Math.max(...data.data.bids.map((bid: any) => bid.price));
+              const bestAsk = Math.min(...data.data.asks.map((ask: any) => Math.abs(ask.price)));
+              
+              const midpoint = (bestBid + bestAsk) / 2;
+              setMidpointPrice(midpoint);
+              
+              const absoluteSpread = bestAsk - bestBid;
+              const percentageSpread = (absoluteSpread / midpoint) * 100;
+              
+              setSpread({
+                absolute: absoluteSpread,
+                percentage: percentageSpread
+              });
+            }
+          } else if (data.type === 'trade') {
+            // Update last price
+            setLastPrice(data.data.price);
+          }
         } catch (error) {
-          console.error('Error processing message:', error);
+          console.error('Error parsing WebSocket message:', error);
         }
-      };
-      
-      ws.onerror = (event) => {
-        console.error('WebSocket error:', event);
-        // Don't stop polling on error
       };
       
       ws.onclose = (event) => {
-        console.log('WebSocket closed with code:', event.code, 'reason:', event.reason);
+        console.log('WebSocket connection closed:', event.code, event.reason);
         setWsConnected(false);
-        // Restart polling if WebSocket closes
-        if (intervalId === null) {
-          const newIntervalId = setInterval(() => {
-            fetchOrderbookREST(bookId);
-          }, 1000);
-          return () => clearInterval(newIntervalId);
-        }
+        
+        // Attempt to reconnect after a delay
+        setTimeout(() => {
+          if (mounted) {
+            connectWebSocket();
+          }
+        }, 3000);
       };
-    } catch (error) {
-      console.error('Error creating WebSocket:', error);
-    }
-    
-    return () => {
-      if (ws) ws.close();
-      clearInterval(intervalId);
+      
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        ws?.close();
+      };
     };
-  }, [isClient]);
-  
-  // Update the REST API fetch function
-  const fetchOrderbookREST = async (bookId: string) => {
-    try {
-      // Use the direct URL with proper CORS headers
-      const response = await fetch(`http://127.0.0.1:8080/api/books/${bookId}/orderbook`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        // Include credentials if your API requires authentication
-        credentials: 'include',
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      processOrderbookData(data);
-    } catch (error) {
-      console.error('Error fetching orderbook via REST:', error);
-    }
-  };
-  
-  // Process orderbook data
-  const processOrderbookData = (data: any) => {
-    // Process bids (positive prices)
-    const processedBids = processOrders(data.bids, true);
     
-    // Process asks (negative prices in the API, convert to positive for display)
-    const processedAsks = processOrders(data.asks.map((ask: any) => ({
-      price: Math.abs(ask.price),
-      quantity: ask.size || ask.quantity
-    })), false);
+    connectWebSocket();
     
-    setOrderbook({
-      bids: processedBids,
-      asks: processedAsks
-    });
-    
-    // Calculate midpoint price
-    if (processedBids.length > 0 && processedAsks.length > 0) {
-      const highestBid = processedBids[0].price;
-      const lowestAsk = processedAsks[0].price;
-      const midpoint = (highestBid + lowestAsk) / 2;
-      setMidpointPrice(midpoint);
-      
-      // Calculate spread
-      const absoluteSpread = lowestAsk - highestBid;
-      const percentageSpread = (absoluteSpread / midpoint) * 100;
-      setSpread({
-        absolute: absoluteSpread,
-        percentage: percentageSpread
-      });
-      
-      // Use highest bid as last price if not available
-      if (!lastPrice) {
-        setLastPrice(highestBid);
-      }
-    }
-  };
-  
-  // Helper function to process orders and calculate totals
-  const processOrders = (orders: Array<{price: number, quantity: number}>, isBid: boolean) => {
-    let runningTotal = 0;
-    return orders
-      .sort((a, b) => isBid ? b.price - a.price : a.price - b.price) // Sort bids descending, asks ascending
-      .map(order => {
-        runningTotal += order.quantity * order.price;
-        return {
-          price: order.price,
-          quantity: order.quantity,
-          total: runningTotal
+    // Fetch initial orderbook state
+    const fetchOrderbook = async () => {
+      try {
+        const data = await orderbookService.getOrderbook('NMA-USD');
+        console.log('Initial orderbook data:', data);
+        
+        // Transform the data to match the expected format
+        const transformedData = {
+          bids: data.bids.map((bid: any) => ({
+            price: bid.price,
+            quantity: bid.size,
+            total: bid.price * bid.size
+          })),
+          asks: data.asks.map((ask: any) => ({
+            price: Math.abs(ask.price),  // Convert negative prices to positive for display
+            quantity: ask.size,
+            total: Math.abs(ask.price) * ask.size
+          }))
         };
-      });
-  };
+        
+        setOrderbook(transformedData);
+        
+        // Calculate midpoint and spread
+        if (data.bids.length > 0 && data.asks.length > 0) {
+          const bestBid = Math.max(...data.bids.map((bid: any) => bid.price));
+          const bestAsk = Math.min(...data.asks.map((ask: any) => Math.abs(ask.price)));
+          
+          const midpoint = (bestBid + bestAsk) / 2;
+          setMidpointPrice(midpoint);
+          
+          const absoluteSpread = bestAsk - bestBid;
+          const percentageSpread = (absoluteSpread / midpoint) * 100;
+          
+          setSpread({
+            absolute: absoluteSpread,
+            percentage: percentageSpread
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching orderbook:', error);
+      }
+    };
+    
+    fetchOrderbook();
+    
+    // Clean up on unmount
+    return () => {
+      if (ws) {
+        console.log('Closing WebSocket connection');
+        ws.close();
+      }
+    };
+  }, [mounted, orderbookService]);
 
   const handleOrderSubmit = async () => {
     if (!isAuthenticated) {

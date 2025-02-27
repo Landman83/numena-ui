@@ -214,4 +214,31 @@ export class OrderbookService {
     }
     return await response.json();
   }
+
+  connectOrderbookWebSocket(bookId: string, onUpdate: (data: any) => void): WebSocket {
+    const ws = new WebSocket(`ws://localhost:8080/api/ws/orderbook/${bookId}`);
+    
+    ws.onopen = () => {
+      console.log(`WebSocket connection established for ${bookId}`);
+    };
+    
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onUpdate(data);
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+    
+    ws.onclose = (event) => {
+      console.log(`WebSocket connection closed for ${bookId}:`, event.code, event.reason);
+    };
+    
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+    
+    return ws;
+  }
 } 
