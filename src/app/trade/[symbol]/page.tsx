@@ -144,7 +144,7 @@ export default function Home() {
 
   const handleLogout = () => {
     // Add logout logic here
-    router.push('/sign-up-or-in/signin')
+    router.push('/signin')
   }
 
   // Update useEffect to only set authentication status
@@ -319,7 +319,7 @@ export default function Home() {
   const handleOrderSubmit = async () => {
     if (!isAuthenticated) {
       // Redirect to sign in page if not authenticated
-      router.push('/sign-up-or-in/signin');
+      router.push('/signin');
       return;
     }
 
