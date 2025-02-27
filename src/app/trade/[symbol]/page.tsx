@@ -470,18 +470,18 @@ export default function Home() {
 
       {/* Main Trading Area */}
       <div className="flex flex-1 px-5 pt-3 gap-3">
-        {/* Chart Section */}
+        {/* Chart Section - make it wider */}
         <div className="flex-grow bg-[#050d17] rounded-lg shadow-md p-4 min-h-[600px] border border-gray-900">
           <div className="text-gray-500 flex items-center justify-center h-full border border-gray-900 rounded-lg">
             TradingView Chart Placeholder
           </div>
         </div>
-
-        {/* Right Side Panel */}
-        <div style={{ width: '651px' }}>
+        
+        {/* Right Side Panel - keep the same structure but adjust widths */}
+        <div style={{ width: '750px' }}>  {/* Increased from 500px */}
           <div className="flex gap-3">
-          {/* Orderbook */}
-            <div className="flex-1 bg-[#050d17] rounded-lg shadow-md p-4 border border-gray-900" style={{ width: '351px' }}>
+            {/* Orderbook - increase width by 50% */}
+            <div className="flex-1 bg-[#050d17] rounded-lg shadow-md p-4 border border-gray-900" style={{ width: '375px' }}>  {/* Increased from 250px */}
               {/* Header Row */}
               <div className="flex justify-between items-center mb-4 px-2">
                 <div className="flex space-x-4">
@@ -622,153 +622,95 @@ export default function Home() {
                 </div>
               </div>
             </div>
-          </div>
+            
+            {/* Buy/Sell Widget - increase width by 50% */}
+            <div style={{ width: '375px' }}>  {/* Increased from 250px */}
+              <div className={`bg-[#050d17] rounded-lg shadow-md p-4 border border-gray-900 h-full ${
+                tradeType === 'buy' 
+                  ? 'bg-gradient-to-b from-green-950/10 to-[#050d17]' 
+                  : 'bg-gradient-to-b from-red-950/10 to-[#050d17]'
+              }`}>
+                {/* Header Row */}
+                <div className="flex justify-between items-center mb-4 px-2">
+                  {/* Buy/Sell Toggle */}
+                  <div className="flex space-x-4">
+                    <button 
+                      onClick={() => setTradeType('buy')}
+                      className={`text-gray-300 w-12 text-left ${
+                        tradeType === 'buy' 
+                          ? 'font-semibold' 
+                          : 'font-normal'
+                      }`}
+                    >
+                      <span className={`inline-block pb-1 border-b-2 ${
+                        tradeType === 'buy' ? 'border-white' : 'border-transparent'
+                      }`}>
+                        Buy
+                      </span>
+                    </button>
+                    <button 
+                      onClick={() => setTradeType('sell')}
+                      className={`text-gray-300 ${
+                        tradeType === 'sell' 
+                          ? 'font-semibold' 
+                          : 'font-normal'
+                      }`}
+                    >
+                      <span className={`inline-block pb-1 border-b-2 ${
+                        tradeType === 'sell' ? 'border-white' : 'border-transparent'
+                      }`}>
+                        Sell
+                      </span>
+                    </button>
+                  </div>
 
-          {/* Buy/Sell Widget */}
-          <div style={{ width: '300px' }}>
-            <div className={`bg-[#050d17] rounded-lg shadow-md p-4 border border-gray-900 h-[600px] ${
-              tradeType === 'buy' 
-                ? 'bg-gradient-to-b from-green-950/10 to-[#050d17]' 
-                : tradeType === 'sell'
-                  ? 'bg-gradient-to-b from-red-950/10 to-[#050d17]'
-                  : ''
-            }`}>
-              {/* Header Row */}
-              <div className="flex justify-between items-center mb-4 px-2">
-                {/* Buy/Sell Toggle */}
-                <div className="flex space-x-4">
-                  <button 
-                    onClick={() => setTradeType('buy')}
-                    className={`text-gray-300 w-12 text-left ${
-                      tradeType === 'buy' 
-                        ? 'font-semibold' 
-                        : 'font-normal'
-                    }`}
-                  >
-                    <span className={`inline-block pb-1 border-b-2 ${
-                      tradeType === 'buy' ? 'border-white' : 'border-transparent'
-                    }`}>
-                      Buy
-                    </span>
-                  </button>
-                  <button 
-                    onClick={() => setTradeType('sell')}
-                    className={`text-gray-300 ${
-                      tradeType === 'sell' 
-                        ? 'font-semibold' 
-                        : 'font-normal'
-                    }`}
-                  >
-                    <span className={`inline-block pb-1 border-b-2 ${
-                      tradeType === 'sell' ? 'border-white' : 'border-transparent'
-                    }`}>
-                      Sell
-                    </span>
-                  </button>
+                  {/* Order Type Dropdown */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowAdvancedMenu(!showAdvancedMenu)}
+                      className="flex items-center space-x-2 px-3 py-1 text-gray-400 hover:text-white"
+                    >
+                      <span className="uppercase">{orderType}</span>
+                      <FiChevronDown className={`transform transition-transform ${showAdvancedMenu ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {showAdvancedMenu && (
+                      <div className="absolute top-full right-0 mt-1 w-32 bg-[#0d1825] border border-gray-800 rounded-lg shadow-lg z-10">
+                        {orderTypes.map((type) => (
+                          <button
+                            key={type}
+                            onClick={() => {
+                              if (type === 'market' || type === 'limit') {
+                                setOrderType(type)
+                              }
+                              setShowAdvancedMenu(false)
+                            }}
+                            className="w-full px-3 py-2 text-left text-gray-400 hover:text-white hover:bg-[#161f2c] first:rounded-t-lg last:rounded-b-lg text-sm"
+                          >
+                            {type.charAt(0).toUpperCase() + type.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* Order Type Dropdown */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowAdvancedMenu(!showAdvancedMenu)}
-                    className="flex items-center space-x-2 px-3 py-1 text-gray-400 hover:text-white"
-                  >
-                    <span className="uppercase">{orderType}</span>
-                    <FiChevronDown className={`transform transition-transform ${showAdvancedMenu ? 'rotate-180' : ''}`} />
-                  </button>
-                  
-                  {showAdvancedMenu && (
-                    <div className="absolute top-full right-0 mt-1 w-32 bg-[#0d1825] border border-gray-800 rounded-lg shadow-lg z-10">
-                      {orderTypes.map((type) => (
-                        <button
-                          key={type}
-                          onClick={() => {
-                            if (type === 'market' || type === 'limit') {
-                              setOrderType(type)
-                            }
-                            setShowAdvancedMenu(false)
-                          }}
-                          className="w-full px-3 py-2 text-left text-gray-400 hover:text-white hover:bg-[#161f2c] first:rounded-t-lg last:rounded-b-lg text-sm"
-                        >
-                          {type.charAt(0).toUpperCase() + type.slice(1)}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+                {/* Horizontal Divider */}
+                <div className="w-full h-px bg-gray-800 mb-4"></div>
 
-              {/* Horizontal Divider */}
-              <div className="w-full h-px bg-gray-800 mb-4"></div>
-
-              <div className="flex flex-col h-[500px]">
-                {/* Size/Limit Input Section */}
-                <div className="mb-4 px-2">
-                  {orderType === 'market' ? (
-                    <>
-                      <div className="text-gray-400 text-sm mb-2">Size</div>
-                      <div className="flex flex-col gap-2 mb-4">
-                        {/* NMA Input */}
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={sizeNMA}
-                            onChange={(e) => handleNMAChange(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
-                                     bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
-                            placeholder="0.0000"
-                          />
-                          <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
-                            NMA
-                          </span>
-                        </div>
-
-                        {/* USD Input */}
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={sizeUSD}
-                            onChange={(e) => handleUSDChange(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
-                                     bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
-                            placeholder="0.00"
-                          />
-                          <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
-                            USD
-                          </span>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {/* Limit Price Input */}
-                      <div className="mb-4">
-                        <div className="text-gray-400 text-sm mb-2">Limit Price</div>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={limitPrice}
-                            onChange={(e) => handleLimitPriceChange(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
-                                     bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
-                            placeholder="0.00"
-                          />
-                          <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
-                            USD
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Quantity and Total Inputs */}
-                      <div className="flex gap-2 mb-4">
-                        {/* Quantity Input */}
-                        <div className="flex-1">
-                          <div className="text-gray-400 text-sm mb-2">Quantity</div>
+                <div className="flex flex-col h-[500px]">
+                  {/* Size/Limit Input Section */}
+                  <div className="mb-4 px-2">
+                    {orderType === 'market' ? (
+                      <>
+                        <div className="text-gray-400 text-sm mb-2">Size</div>
+                        <div className="flex flex-col gap-2 mb-4">
+                          {/* NMA Input */}
                           <div className="relative">
                             <input
                               type="text"
-                              value={limitQuantity}
-                              onChange={(e) => handleLimitQuantityChange(e.target.value)}
+                              value={sizeNMA}
+                              onChange={(e) => handleNMAChange(e.target.value)}
                               className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
                                        bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
                               placeholder="0.0000"
@@ -777,16 +719,13 @@ export default function Home() {
                               NMA
                             </span>
                           </div>
-                        </div>
 
-                        {/* Total Input */}
-                        <div className="flex-1">
-                          <div className="text-gray-400 text-sm mb-2">Total</div>
+                          {/* USD Input */}
                           <div className="relative">
                             <input
                               type="text"
-                              value={limitTotal}
-                              onChange={(e) => handleLimitTotalChange(e.target.value)}
+                              value={sizeUSD}
+                              onChange={(e) => handleUSDChange(e.target.value)}
                               className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
                                        bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
                               placeholder="0.00"
@@ -796,81 +735,140 @@ export default function Home() {
                             </span>
                           </div>
                         </div>
-                      </div>
-                    </>
-                  )}
+                      </>
+                    ) : (
+                      <>
+                        {/* Limit Price Input */}
+                        <div className="mb-4">
+                          <div className="text-gray-400 text-sm mb-2">Limit Price</div>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={limitPrice}
+                              onChange={(e) => handleLimitPriceChange(e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
+                                       bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
+                              placeholder="0.00"
+                            />
+                            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
+                              USD
+                            </span>
+                          </div>
+                        </div>
 
-                  {/* TP/SL Toggle */}
-                  <div className="flex items-center">
-                    <span className="text-gray-400 text-sm mr-2">TP/SL</span>
-                    <button
-                      onClick={() => setTpslEnabled(!tpslEnabled)}
-                      className={`w-4 h-4 rounded-full border transition-colors ${
-                        tpslEnabled
-                          ? 'bg-blue-500 border-blue-500'
-                          : 'border-gray-600 hover:border-gray-500'
-                      }`}
+                        {/* Quantity and Total Inputs */}
+                        <div className="flex gap-2 mb-4">
+                          {/* Quantity Input */}
+                          <div className="flex-1">
+                            <div className="text-gray-400 text-sm mb-2">Quantity</div>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={limitQuantity}
+                                onChange={(e) => handleLimitQuantityChange(e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
+                                         bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
+                                placeholder="0.0000"
+                              />
+                              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
+                                NMA
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Total Input */}
+                          <div className="flex-1">
+                            <div className="text-gray-400 text-sm mb-2">Total</div>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={limitTotal}
+                                onChange={(e) => handleLimitTotalChange(e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg text-sm border border-gray-800 
+                                         bg-[#0d1825] text-white focus:outline-none focus:ring-1 focus:ring-gray-700"
+                                placeholder="0.00"
+                              />
+                              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
+                                USD
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* TP/SL Toggle */}
+                    <div className="flex items-center">
+                      <span className="text-gray-400 text-sm mr-2">TP/SL</span>
+                      <button
+                        onClick={() => setTpslEnabled(!tpslEnabled)}
+                        className={`w-4 h-4 rounded-full border transition-colors ${
+                          tpslEnabled
+                            ? 'bg-blue-500 border-blue-500'
+                            : 'border-gray-600 hover:border-gray-500'
+                        }`}
+                      >
+                        {tpslEnabled && (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                          </div>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-auto px-2">
+                    {/* Buy/Sell Button */}
+                    <button 
+                      onClick={handleOrderSubmit}
+                      className={`w-full py-3 rounded-lg font-semibold text-white ${
+                        orderType === 'market' ? 'mb-4' : 'mb-3'
+                      } ${
+                        !isAuthenticated
+                          ? 'bg-blue-600 hover:bg-blue-700 border border-blue-500'
+                          : tradeType === 'buy' 
+                            ? 'bg-[#16a34a]/90 hover:bg-[#15803d]/90 border border-[#16a34a]' 
+                            : 'bg-red-600 hover:bg-red-700'
+                      } transition-colors`}
                     >
-                      {tpslEnabled && (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                      {isAuthenticated 
+                        ? `${tradeType === 'buy' ? 'Buy' : 'Sell'} NMA` 
+                        : 'Sign in to Trade'}
+                    </button>
+
+                    {/* Order Details */}
+                    <div className="border border-gray-800 rounded-lg p-3 text-sm space-y-2">
+                      {/* Order Value */}
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Order Value</span>
+                        <span className="text-gray-300">
+                          ${formatNumber((parseFloat(orderType === 'market' ? sizeUSD : limitTotal || '0') + 
+                            calculateFees(orderType === 'market' ? sizeUSD : limitTotal)).toString(), true)}
+                        </span>
+                      </div>
+
+                      {/* Fees */}
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Fees</span>
+                        <span className="text-gray-300">
+                          ${formatNumber(calculateFees(orderType === 'market' ? sizeUSD : limitTotal).toString(), true)}
+                        </span>
+                      </div>
+
+                      {/* Fee Rates */}
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Fee Rates</span>
+                        <span className="text-gray-300">0.05% / 0.10%</span>
+                      </div>
+
+                      {/* Slippage - Only show for market orders */}
+                      {orderType === 'market' && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Slippage</span>
+                          <span className="text-blue-400">Est: 0.0036% / Max: 8.00%</span>
                         </div>
                       )}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-auto px-2">
-                  {/* Buy/Sell Button */}
-                  <button 
-                    onClick={handleOrderSubmit}
-                    className={`w-full py-3 rounded-lg font-semibold text-white ${
-                      orderType === 'market' ? 'mb-4' : 'mb-3'
-                    } ${
-                      !isAuthenticated
-                        ? 'bg-blue-600 hover:bg-blue-700 border border-blue-500'
-                        : tradeType === 'buy' 
-                          ? 'bg-[#16a34a]/90 hover:bg-[#15803d]/90 border border-[#16a34a]' 
-                          : 'bg-red-600 hover:bg-red-700'
-                    } transition-colors`}
-                  >
-                    {isAuthenticated 
-                      ? `${tradeType === 'buy' ? 'Buy' : 'Sell'} NMA` 
-                      : 'Sign in to Trade'}
-                  </button>
-
-                  {/* Order Details */}
-                  <div className="border border-gray-800 rounded-lg p-3 text-sm space-y-2">
-                    {/* Order Value */}
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Order Value</span>
-                      <span className="text-gray-300">
-                        ${formatNumber((parseFloat(orderType === 'market' ? sizeUSD : limitTotal || '0') + 
-                          calculateFees(orderType === 'market' ? sizeUSD : limitTotal)).toString(), true)}
-                      </span>
                     </div>
-
-                    {/* Fees */}
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Fees</span>
-                      <span className="text-gray-300">
-                        ${formatNumber(calculateFees(orderType === 'market' ? sizeUSD : limitTotal).toString(), true)}
-                      </span>
-                    </div>
-
-                    {/* Fee Rates */}
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Fee Rates</span>
-                      <span className="text-gray-300">0.05% / 0.10%</span>
-                    </div>
-
-                    {/* Slippage - Only show for market orders */}
-                    {orderType === 'market' && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Slippage</span>
-                        <span className="text-blue-400">Est: 0.0036% / Max: 8.00%</span>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
